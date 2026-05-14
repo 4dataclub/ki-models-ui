@@ -3,35 +3,120 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { AiModel, AiModelCreate } from '../models/ai-model';
+import { ApiKeySetting } from '../models/api-key-setting';
 
 /**
  * Form um ein neues AI-Modell zur Cascade hinzuzufügen.
  *
- * **Skeleton** — Phase L.2 portiert: Provider-Dropdown (mit allen unterstützten
- * Providern), Model-ID-Combobox (mit Autocomplete pro Provider), settingKey-
- * Auswahl (Default `<provider>ApiKey` oder freie Eingabe), Submit-Validation.
+ * **Felder:**
+ * - Provider-Dropdown (gemini, openai, anthropic, openrouter, deepseek, openai_compat)
+ * - Model-ID-Combobox mit Provider-spezifischen Vorschlägen (datalist)
+ * - apiKeySettingKey-Auswahl (vorbelegt aus existierenden API-Keys + Default per Provider)
+ * - DisplayName (optional)
+ * - Cooldown503OverrideSec (optional)
+ * - Add-Button
  *
- * **Event:** `(modelCreated)` emittet das neue Model nach erfolgreichem POST,
- * Konsument kann die Models-Tabelle reloaden.
+ * **Event:** `(modelCreated)` emittet das neue Model nach erfolgreichem POST.
+ *
+ * **Provider-Default-Keys:** Beim Provider-Wechsel wird `apiKeySettingKey`
+ * automatisch auf `<provider>ApiKey` umgestellt (Convenience).
  */
 @Component({
   selector: 'ki-add-model-form',
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <form class="ki-add-model-form" (ngSubmit)="onSubmit()">
-      <!-- TODO L.2: Provider-Dropdown + Model-ID-Combobox + settingKey-Select -->
-      <input [(ngModel)]="provider" name="provider" placeholder="provider (z.B. gemini)" required />
-      <input [(ngModel)]="modelId" name="modelId" placeholder="modelId (z.B. gemini-2.5-flash)" required />
-      <input [(ngModel)]="apiKeySettingKey" name="apiKeySettingKey" placeholder="apiKeySettingKey (optional)" />
-      <button type="submit" [disabled]="submitting()">Hinzufügen</button>
-      <p *ngIf="error()" class="error">{{ error() }}</p>
+    <form class="ki-add-model-form" (ngSubmit)="onSubmit()" #f="ngForm">
+      <h4 class="ki-form-title">Add Model</h4>
+
+      <div class="ki-grid">
+        <select [(ngModel)]="provider"
+                name="provider"
+                (change)="onProviderChange()"
+                class="ki-input">
+          <option *ngFor="let p of providerOptions" [value]="p.value">{{ p.label }}</option>
+        </select>
+
+        <input [(ngModel)]="modelId"
+               name="modelId"
+               list="ki-model-id-suggestions"
+               placeholder="Model ID (e.g. gemini-2.5-flash)"
+               class="ki-input ki-mono"
+               required />
+        <datalist id="ki-model-id-suggestions">
+          <option *ngFor="let s of modelIdSuggestions()" [value]="s"></option>
+        </datalist>
+
+        <select [(ngModel)]="apiKeySettingKey"
+                name="apiKeySettingKey"
+                class="ki-input ki-mono">
+          <option value="" disabled>API-Key Setting</option>
+          <option *ngFor="let k of keyOptions()" [value]="k.settingKey">
+            {{ k.settingKey }} {{ k.configured ? '✓' : '' }}
+          </option>
+        </select>
+
+        <input [(ngModel)]="displayName"
+               name="displayName"
+               placeholder="Display Name (optional)"
+               class="ki-input" />
+
+        <input [(ngModel)]="cooldown503OverrideSec"
+               name="cooldown503OverrideSec"
+               type="number"
+               placeholder="Cooldown 503 override (sec, optional)"
+               class="ki-input" />
+
+        <button type="submit"
+                [disabled]="submitting() || !provider || !modelId || !apiKeySettingKey"
+                class="ki-btn-primary">
+          {{ submitting() ? 'Adding…' : 'Add Model' }}
+        </button>
+      </div>
+
+      <p *ngIf="error()" class="ki-error">{{ error() }}</p>
+      <p class="ki-hint">
+        The API key setting holds the actual key value — it lives in the API-Keys section below.
+        Multiple models may share the same setting key.
+      </p>
     </form>
   `,
   styles: [`
-    .ki-add-model-form { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-    .ki-add-model-form input { padding: 0.4rem; border: 1px solid #ccc; border-radius: 4px; }
-    .error { color: #b91c1c; }
+    .ki-add-model-form { font-family: inherit; padding: 1rem 0; border-top: 1px solid #e2e8f0; }
+    .ki-form-title {
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #475569;
+      margin-bottom: 0.75rem;
+    }
+    .ki-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .ki-input {
+      padding: 0.75rem;
+      background: #f8fafc;
+      border: 2px solid #f1f5f9;
+      border-radius: 0.75rem;
+      font-size: 0.875rem;
+      font-weight: 700;
+    }
+    .ki-mono { font-family: ui-monospace, monospace; }
+    .ki-btn-primary {
+      padding: 0.75rem 1rem;
+      background: #0f172a;
+      color: white;
+      border: none;
+      border-radius: 1rem;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      font-size: 0.75rem;
+      cursor: pointer;
+      grid-column: span 2;
+    }
+    .ki-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .ki-error { color: #b91c1c; font-weight: 700; margin-top: 0.5rem; font-size: 0.75rem; }
+    .ki-hint { color: #94a3b8; font-size: 0.7rem; font-weight: 700; margin-top: 0.75rem; }
   `],
 })
 export class AddModelFormComponent {
@@ -39,32 +124,120 @@ export class AddModelFormComponent {
 
   private readonly api = inject(KiModelsApiService);
 
-  provider = '';
+  // Form state
+  provider = 'gemini';
   modelId = '';
-  apiKeySettingKey = '';
+  apiKeySettingKey = 'geminiApiKey';
+  displayName = '';
+  cooldown503OverrideSec: number | null = null;
 
   readonly submitting = signal(false);
   readonly error = signal<string | null>(null);
+  readonly keys = signal<ApiKeySetting[]>([]);
+
+  readonly providerOptions = [
+    { value: 'gemini',        label: 'Gemini (Google)' },
+    { value: 'openai',        label: 'OpenAI (api.openai.com)' },
+    { value: 'anthropic',     label: 'Anthropic (Claude)' },
+    { value: 'openrouter',    label: 'OpenRouter' },
+    { value: 'deepseek',      label: 'DeepSeek (api.deepseek.com)' },
+    { value: 'openai_compat', label: 'Custom (self-hosted OpenAI API)' },
+  ];
+
+  private readonly defaultSettingKey: Record<string, string> = {
+    gemini:        'geminiApiKey',
+    openai:        'openaiApiKey',
+    anthropic:     'anthropicApiKey',
+    openrouter:    'openrouterApiKey',
+    deepseek:      'deepseekApiKey',
+    openai_compat: 'customApiKey',
+  };
+
+  private readonly modelIdSuggestionsByProvider: Record<string, string[]> = {
+    gemini: [
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.5-pro',
+      'gemini-3-flash-preview',
+      'gemini-3-pro-preview',
+    ],
+    openai: [
+      'gpt-4o',
+      'gpt-4o-mini',
+      'gpt-4.1',
+      'gpt-4.1-mini',
+      'o1-mini',
+      'o1-preview',
+    ],
+    anthropic: [
+      'claude-opus-4-7',
+      'claude-sonnet-4-6',
+      'claude-haiku-4-5-20251001',
+    ],
+    openrouter: [
+      'deepseek/deepseek-v4-flash',
+      'deepseek/deepseek-v4-pro',
+      'deepseek/deepseek-chat-v3.1',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'openai/gpt-oss-120b:free',
+    ],
+    deepseek: [
+      'deepseek-v4-flash',
+      'deepseek-v4-pro',
+      'deepseek-chat',
+    ],
+    openai_compat: [],
+  };
+
+  ngOnInit(): void {
+    this.api.listKeys().subscribe({
+      next: (list) => this.keys.set(list),
+      error: () => this.keys.set([]),
+    });
+  }
+
+  onProviderChange(): void {
+    const def = this.defaultSettingKey[this.provider];
+    if (def) this.apiKeySettingKey = def;
+  }
+
+  modelIdSuggestions(): string[] {
+    return this.modelIdSuggestionsByProvider[this.provider] ?? [];
+  }
+
+  /** Existierende Settings als Optionen + Default-Settings die noch nicht in DB sind. */
+  keyOptions(): { settingKey: string; configured: boolean }[] {
+    const existing = new Map<string, boolean>(this.keys().map((k) => [k.settingKey, k.configured]));
+    // Default-settingKeys aus dem Mapping ergänzen (auch wenn DB sie noch nicht hat)
+    Object.values(this.defaultSettingKey).forEach((sk) => {
+      if (!existing.has(sk)) existing.set(sk, false);
+    });
+    return Array.from(existing.entries())
+      .map(([settingKey, configured]) => ({ settingKey, configured }))
+      .sort((a, b) => a.settingKey.localeCompare(b.settingKey));
+  }
 
   onSubmit(): void {
-    if (!this.provider || !this.modelId) return;
+    if (!this.provider || !this.modelId || !this.apiKeySettingKey) return;
     this.submitting.set(true);
     this.error.set(null);
     const body: AiModelCreate = {
-      provider: this.provider,
-      modelId: this.modelId,
-      apiKeySettingKey: this.apiKeySettingKey || `${this.provider}ApiKey`,
+      provider: this.provider.trim(),
+      modelId: this.modelId.trim(),
+      apiKeySettingKey: this.apiKeySettingKey.trim(),
+      displayName: this.displayName?.trim() || undefined,
+      cooldown503OverrideSec: this.cooldown503OverrideSec,
     };
     this.api.createModel(body).subscribe({
       next: (created) => {
         this.modelCreated.emit(created);
-        this.provider = '';
         this.modelId = '';
-        this.apiKeySettingKey = '';
+        this.displayName = '';
+        this.cooldown503OverrideSec = null;
         this.submitting.set(false);
       },
       error: (err) => {
-        this.error.set(err?.error?.error ?? 'Fehler beim Anlegen');
+        this.error.set(err?.error?.error ?? 'Failed to add model');
         this.submitting.set(false);
       },
     });
