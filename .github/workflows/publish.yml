@@ -1,0 +1,41 @@
+name: Publish Library
+
+# Auto-publish auf GitHub Packages bei jedem Tag `v*` (z.B. v0.1.0, v0.2.0).
+# Manuelles Tag-Setzen:
+#   cd projects/ki-models-ui && npm version patch  (oder minor/major)
+#   cd ../..
+#   git push --follow-tags
+# → Workflow rennt, baut Library, publisht zu npm.pkg.github.com.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:   # auch manuell triggerbar aus GitHub-UI
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@dataclub'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build library
+        run: npx ng build ki-models-ui
+
+      - name: Publish to GitHub Packages
+        run: npm publish
+        working-directory: dist/ki-models-ui
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
