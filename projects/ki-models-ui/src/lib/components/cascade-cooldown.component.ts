@@ -1,7 +1,8 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, Input, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { CascadeConfig, CooldownOverride } from '../models/cascade-config';
+import { CascadeCooldownLabels, CASCADE_COOLDOWN_LABELS_EN } from '../models/labels';
 
 /**
  * Tri-State Cooldown-Override-Panel.
@@ -20,45 +21,41 @@ import { CascadeConfig, CooldownOverride } from '../models/cascade-config';
   imports: [CommonModule],
   template: `
     <div class="ki-cooldown" *ngIf="config() as cfg">
-      <h4 class="ki-section-title">Cascade Cooldown</h4>
-      <p class="ki-subtitle">Override the per-model cooldown behaviour globally.</p>
+      <h4 class="ki-section-title">{{ L.title }}</h4>
+      <p class="ki-subtitle">{{ L.subtitle }}</p>
 
       <div class="ki-controls">
         <button (click)="set(null)"
                 class="ki-state-btn"
                 [class.ki-state-active]="cfg.cooldownOverride === null"
                 [class.ki-state-default]="cfg.cooldownOverride === null">
-          Default
+          {{ L.default }}
         </button>
         <button (click)="set(true)"
                 class="ki-state-btn"
                 [class.ki-state-active]="cfg.cooldownOverride === true"
                 [class.ki-state-on]="cfg.cooldownOverride === true">
-          Force ON
+          {{ L.forceOn }}
         </button>
         <button (click)="set(false)"
                 class="ki-state-btn"
                 [class.ki-state-active]="cfg.cooldownOverride === false"
                 [class.ki-state-off]="cfg.cooldownOverride === false">
-          Force OFF
+          {{ L.forceOff }}
         </button>
 
         <span class="ki-effective-badge"
               [class.ki-effective-on]="cfg.effectiveCooldown"
               [class.ki-effective-off]="!cfg.effectiveCooldown">
-          {{ cfg.effectiveCooldown ? 'Effective: ON' : 'Effective: OFF' }}
+          {{ cfg.effectiveCooldown ? L.effectiveOn : L.effectiveOff }}
         </span>
       </div>
 
-      <p class="ki-hint">
-        Default = each model decides for itself. Force ON keeps cooldowns even when
-        a model would skip them. Force OFF removes all cooldowns globally — use with
-        care, useful for testing.
-      </p>
+      <p class="ki-hint">{{ L.hint }}</p>
     </div>
 
-    <div *ngIf="!config() && loading()" class="ki-muted">Loading cascade config…</div>
-    <div *ngIf="!config() && !loading()" class="ki-error">Failed to load cascade config.</div>
+    <div *ngIf="!config() && loading()" class="ki-muted">{{ L.loading }}</div>
+    <div *ngIf="!config() && !loading()" class="ki-error">{{ L.errorLoad }}</div>
   `,
   styles: [`
     .ki-cooldown { font-family: inherit; padding: 1.5rem 0; }
@@ -106,6 +103,11 @@ import { CascadeConfig, CooldownOverride } from '../models/cascade-config';
   `],
 })
 export class CascadeCooldownComponent {
+  @Input() set labels(v: Partial<CascadeCooldownLabels> | undefined) {
+    this.L = { ...CASCADE_COOLDOWN_LABELS_EN, ...(v ?? {}) };
+  }
+  L: CascadeCooldownLabels = CASCADE_COOLDOWN_LABELS_EN;
+
   private readonly api = inject(KiModelsApiService);
 
   readonly loading = signal(true);

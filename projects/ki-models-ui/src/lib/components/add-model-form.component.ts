@@ -1,9 +1,10 @@
-import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { AiModel, AiModelCreate } from '../models/ai-model';
 import { ApiKeySetting } from '../models/api-key-setting';
+import { AddModelFormLabels, ADD_MODEL_FORM_LABELS_EN } from '../models/labels';
 
 /**
  * Form um ein neues AI-Modell zur Cascade hinzuzufügen.
@@ -27,20 +28,20 @@ import { ApiKeySetting } from '../models/api-key-setting';
   imports: [CommonModule, FormsModule],
   template: `
     <form class="ki-add-model-form" (ngSubmit)="onSubmit()" #f="ngForm">
-      <h4 class="ki-form-title">Add Model</h4>
+      <h4 class="ki-form-title">{{ L.title }}</h4>
 
       <div class="ki-grid">
         <select [(ngModel)]="provider"
                 name="provider"
                 (change)="onProviderChange()"
                 class="ki-input">
-          <option *ngFor="let p of providerOptions" [value]="p.value">{{ p.label }}</option>
+          <option *ngFor="let p of L.providerOptions" [value]="p.value">{{ p.label }}</option>
         </select>
 
         <input [(ngModel)]="modelId"
                name="modelId"
                list="ki-model-id-suggestions"
-               placeholder="Model ID (e.g. gemini-2.5-flash)"
+               [placeholder]="L.fieldModelId"
                class="ki-input ki-mono"
                required />
         <datalist id="ki-model-id-suggestions">
@@ -50,7 +51,7 @@ import { ApiKeySetting } from '../models/api-key-setting';
         <select [(ngModel)]="apiKeySettingKey"
                 name="apiKeySettingKey"
                 class="ki-input ki-mono">
-          <option value="" disabled>API-Key Setting</option>
+          <option value="" disabled>{{ L.fieldApiKeySettingKey }}</option>
           <option *ngFor="let k of keyOptions()" [value]="k.settingKey">
             {{ k.settingKey }} {{ k.configured ? '✓' : '' }}
           </option>
@@ -58,27 +59,24 @@ import { ApiKeySetting } from '../models/api-key-setting';
 
         <input [(ngModel)]="displayName"
                name="displayName"
-               placeholder="Display Name (optional)"
+               [placeholder]="L.fieldDisplayName"
                class="ki-input" />
 
         <input [(ngModel)]="cooldown503OverrideSec"
                name="cooldown503OverrideSec"
                type="number"
-               placeholder="Cooldown 503 override (sec, optional)"
+               [placeholder]="L.fieldCooldownOverride"
                class="ki-input" />
 
         <button type="submit"
                 [disabled]="submitting() || !provider || !modelId || !apiKeySettingKey"
                 class="ki-btn-primary">
-          {{ submitting() ? 'Adding…' : 'Add Model' }}
+          {{ submitting() ? L.btnAdding : L.btnAdd }}
         </button>
       </div>
 
       <p *ngIf="error()" class="ki-error">{{ error() }}</p>
-      <p class="ki-hint">
-        The API key setting holds the actual key value — it lives in the API-Keys section below.
-        Multiple models may share the same setting key.
-      </p>
+      <p class="ki-hint">{{ L.hint }}</p>
     </form>
   `,
   styles: [`
@@ -122,6 +120,11 @@ import { ApiKeySetting } from '../models/api-key-setting';
 export class AddModelFormComponent {
   @Output() modelCreated = new EventEmitter<AiModel>();
 
+  @Input() set labels(v: Partial<AddModelFormLabels> | undefined) {
+    this.L = { ...ADD_MODEL_FORM_LABELS_EN, ...(v ?? {}) };
+  }
+  L: AddModelFormLabels = ADD_MODEL_FORM_LABELS_EN;
+
   private readonly api = inject(KiModelsApiService);
 
   // Form state
@@ -134,15 +137,6 @@ export class AddModelFormComponent {
   readonly submitting = signal(false);
   readonly error = signal<string | null>(null);
   readonly keys = signal<ApiKeySetting[]>([]);
-
-  readonly providerOptions = [
-    { value: 'gemini',        label: 'Gemini (Google)' },
-    { value: 'openai',        label: 'OpenAI (api.openai.com)' },
-    { value: 'anthropic',     label: 'Anthropic (Claude)' },
-    { value: 'openrouter',    label: 'OpenRouter' },
-    { value: 'deepseek',      label: 'DeepSeek (api.deepseek.com)' },
-    { value: 'openai_compat', label: 'Custom (self-hosted OpenAI API)' },
-  ];
 
   private readonly defaultSettingKey: Record<string, string> = {
     gemini:        'geminiApiKey',
@@ -237,7 +231,7 @@ export class AddModelFormComponent {
         this.submitting.set(false);
       },
       error: (err) => {
-        this.error.set(err?.error?.error ?? 'Failed to add model');
+        this.error.set(err?.error?.error ?? this.L.errorFailed);
         this.submitting.set(false);
       },
     });

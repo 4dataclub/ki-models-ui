@@ -1,7 +1,8 @@
-import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { AiModel } from '../models/ai-model';
+import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
 
 /**
  * Tabelle aller AI-Modelle in der Cascade-Reihenfolge.
@@ -27,26 +28,26 @@ import { AiModel } from '../models/ai-model';
   template: `
     <div class="ki-models-table">
       <div class="ki-models-table-header">
-        <button (click)="reload()" class="ki-btn-secondary">↻ Refresh</button>
+        <button (click)="reload()" class="ki-btn-secondary">↻ {{ L.refresh }}</button>
       </div>
 
-      <div *ngIf="loading()" class="ki-muted">Loading models…</div>
+      <div *ngIf="loading()" class="ki-muted">{{ L.loading }}</div>
 
       <div *ngIf="!loading() && models().length === 0" class="ki-empty">
-        No models configured. Use the form below to add one.
+        {{ L.empty }}
       </div>
 
       <div *ngIf="models().length > 0" class="ki-table-wrap">
         <table class="ki-table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>Provider</th>
-              <th>Model ID</th>
-              <th>Key</th>
-              <th>Enabled</th>
-              <th>Status</th>
-              <th class="ki-right">Actions</th>
+              <th>{{ L.colNum }}</th>
+              <th>{{ L.colProvider }}</th>
+              <th>{{ L.colModelId }}</th>
+              <th>{{ L.colKey }}</th>
+              <th>{{ L.colEnabled }}</th>
+              <th>{{ L.colStatus }}</th>
+              <th class="ki-right">{{ L.colActions }}</th>
             </tr>
           </thead>
           <tbody>
@@ -59,21 +60,21 @@ import { AiModel } from '../models/ai-model';
                 <div *ngIf="m.displayName" class="ki-muted ki-tiny">{{ m.displayName }}</div>
               </td>
               <td>
-                <span *ngIf="m.keyConfigured" class="ki-badge ki-badge-ok">Key set</span>
-                <span *ngIf="!m.keyConfigured" class="ki-badge ki-badge-warn">Key missing</span>
+                <span *ngIf="m.keyConfigured" class="ki-badge ki-badge-ok">{{ L.keySet }}</span>
+                <span *ngIf="!m.keyConfigured" class="ki-badge ki-badge-warn">{{ L.keyMissing }}</span>
                 <div class="ki-tiny ki-mono ki-muted">{{ m.apiKeySettingKey }}</div>
               </td>
               <td>
                 <button *ngIf="!m.autoDisabled"
                         (click)="toggle(m)"
                         [disabled]="!m.enabled && !m.keyConfigured"
-                        [title]="(!m.enabled && !m.keyConfigured) ? 'Key required before enabling' : ''"
+                        [title]="(!m.enabled && !m.keyConfigured) ? L.toggleNeedsKey : ''"
                         class="ki-toggle"
                         [class.ki-toggle-on]="m.enabled"
                         [class.ki-toggle-off]="!m.enabled">
-                  {{ m.enabled ? 'ON' : 'OFF' }}
+                  {{ m.enabled ? L.on : L.off }}
                 </button>
-                <span *ngIf="m.autoDisabled" class="ki-badge ki-badge-error">🚫 Auto-disabled</span>
+                <span *ngIf="m.autoDisabled" class="ki-badge ki-badge-error">🚫 {{ L.autoDisabled }}</span>
               </td>
               <td>
                 <span *ngIf="m.autoDisabled" class="ki-tiny ki-error" [title]="m.autoDisabledReason || ''">
@@ -83,7 +84,7 @@ import { AiModel } from '../models/ai-model';
                   cd {{ m.cooldownRemainingSec }}s
                 </span>
                 <span *ngIf="!m.autoDisabled && !(m.cooldownRemainingSec ?? 0)" class="ki-tiny ki-ok">
-                  Free
+                  {{ L.free }}
                 </span>
                 <div *ngIf="testResult()[m.id] as r" class="ki-tiny ki-mono"
                      [class.ki-ok]="r.ok"
@@ -96,9 +97,9 @@ import { AiModel } from '../models/ai-model';
               <td class="ki-right ki-actions">
                 <button (click)="move(i, -1)" [disabled]="i === 0" class="ki-btn-icon">↑</button>
                 <button (click)="move(i, 1)" [disabled]="i === models().length - 1" class="ki-btn-icon">↓</button>
-                <button (click)="test(m)" class="ki-btn-secondary">Test</button>
-                <button *ngIf="m.autoDisabled" (click)="reEnable(m)" class="ki-btn-warn">Re-enable</button>
-                <button (click)="remove(m)" class="ki-btn-danger">Delete</button>
+                <button (click)="test(m)" class="ki-btn-secondary">{{ L.btnTest }}</button>
+                <button *ngIf="m.autoDisabled" (click)="reEnable(m)" class="ki-btn-warn">{{ L.btnReenable }}</button>
+                <button (click)="remove(m)" class="ki-btn-danger">{{ L.btnDelete }}</button>
               </td>
             </tr>
           </tbody>
@@ -181,6 +182,12 @@ export class ModelsTableComponent {
   @Output() activeModelChanged = new EventEmitter<AiModel>();
   @Output() modelChanged = new EventEmitter<AiModel | null>();
 
+  /** Optionale Labels — Konsument gibt seine i18n-Strings rein. Default = englisch. */
+  @Input() set labels(v: Partial<ModelsTableLabels> | undefined) {
+    this.L = { ...MODELS_TABLE_LABELS_EN, ...(v ?? {}) };
+  }
+  L: ModelsTableLabels = MODELS_TABLE_LABELS_EN;
+
   private readonly api = inject(KiModelsApiService);
 
   readonly loading = signal(true);
@@ -218,7 +225,7 @@ export class ModelsTableComponent {
   }
 
   remove(m: AiModel): void {
-    if (!confirm(`Delete model "${m.modelId}"?`)) return;
+    if (!confirm(this.L.confirmDelete(m.modelId))) return;
     this.api.deleteModel(m.id).subscribe(() => {
       this.modelChanged.emit(null);
       this.reload();

@@ -1,8 +1,9 @@
-import { Component, EventEmitter, Output, inject, signal, computed } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { ApiKeySetting } from '../models/api-key-setting';
+import { ApiKeysSectionLabels, API_KEYS_SECTION_LABELS_EN } from '../models/labels';
 
 interface KeyOption {
   settingKey: string;
@@ -31,16 +32,13 @@ interface KeyOption {
   imports: [CommonModule, FormsModule],
   template: `
     <div class="ki-keys-section">
-      <h4 class="ki-section-title">API Keys</h4>
-      <p class="ki-subtitle">
-        One value per setting-key. Multiple models referencing the same setting-key
-        share the credential.
-      </p>
+      <h4 class="ki-section-title">{{ L.title }}</h4>
+      <p class="ki-subtitle">{{ L.subtitle }}</p>
 
       <!-- Add/Edit Form -->
       <div class="ki-form-grid">
         <select [(ngModel)]="settingKey" class="ki-input ki-mono">
-          <option value="" disabled>Setting Key</option>
+          <option value="" disabled>{{ L.fieldSettingKey }}</option>
           <option *ngFor="let k of keyOptions()" [value]="k.settingKey">
             {{ k.settingKey }} — {{ k.brand }}
           </option>
@@ -49,33 +47,33 @@ interface KeyOption {
         <div class="ki-input-wrap">
           <input [(ngModel)]="value"
                  [type]="showValue() ? 'text' : 'password'"
-                 placeholder="Key value (empty to clear)"
+                 [placeholder]="L.fieldValue"
                  autocomplete="off"
                  spellcheck="false"
                  class="ki-input ki-mono ki-input-with-toggle" />
           <button type="button" (click)="showValue.set(!showValue())" class="ki-show-toggle">
-            {{ showValue() ? 'Hide' : 'Show' }}
+            {{ showValue() ? L.btnHide : L.btnShow }}
           </button>
         </div>
 
         <button (click)="save()"
                 [disabled]="!canSave() || saving()"
                 class="ki-btn-primary">
-          {{ saving() ? 'Saving…' : 'Save Key' }}
+          {{ saving() ? L.btnSaving : L.btnSave }}
         </button>
       </div>
 
       <!-- Status-Liste -->
       <ng-container *ngIf="configuredKeys().length > 0; else noKeys">
-        <h5 class="ki-list-title">Configured Keys</h5>
+        <h5 class="ki-list-title">{{ L.listTitle }}</h5>
         <div class="ki-table-wrap">
           <table class="ki-table">
             <thead>
               <tr>
-                <th>Setting Key</th>
-                <th>Source</th>
-                <th>Value</th>
-                <th class="ki-right">Actions</th>
+                <th>{{ L.colSettingKey }}</th>
+                <th>{{ L.colSource }}</th>
+                <th>{{ L.colValue }}</th>
+                <th class="ki-right">{{ L.colActions }}</th>
               </tr>
             </thead>
             <tbody>
@@ -87,17 +85,17 @@ interface KeyOption {
                   <span class="ki-badge"
                         [class.ki-badge-db]="k.keySource === 'db'"
                         [class.ki-badge-env]="k.keySource !== 'db'">
-                    {{ k.keySource === 'db' ? 'DB (admin)' : (k.configured ? 'ENV (boot)' : 'missing') }}
+                    {{ k.keySource === 'db' ? L.sourceDb : (k.configured ? L.sourceEnv : L.sourceMissing) }}
                   </span>
                 </td>
                 <td class="ki-mono ki-value">{{ k.valueMasked || '…' }}</td>
                 <td class="ki-right">
-                  <button (click)="editKey(k)" class="ki-btn-secondary">Edit</button>
+                  <button (click)="editKey(k)" class="ki-btn-secondary">{{ L.btnEdit }}</button>
                   <button *ngIf="k.keySource === 'db'"
                           (click)="clearKey(k)"
                           [disabled]="clearing() === k.settingKey"
                           class="ki-btn-danger">
-                    {{ clearing() === k.settingKey ? '…' : 'Clear' }}
+                    {{ clearing() === k.settingKey ? '…' : L.btnClear }}
                   </button>
                 </td>
               </tr>
@@ -106,13 +104,10 @@ interface KeyOption {
         </div>
       </ng-container>
       <ng-template #noKeys>
-        <p class="ki-empty">No keys configured yet. Use the form above to add one.</p>
+        <p class="ki-empty">{{ L.empty }}</p>
       </ng-template>
 
-      <p class="ki-hint">
-        Keys are stored in the consumer's settings table and never echoed to clients
-        in plain text. The value is only used server-side to authenticate model calls.
-      </p>
+      <p class="ki-hint">{{ L.hint }}</p>
     </div>
   `,
   styles: [`
@@ -221,6 +216,11 @@ interface KeyOption {
 export class ApiKeysSectionComponent {
   @Output() keyChanged = new EventEmitter<string>();
 
+  @Input() set labels(v: Partial<ApiKeysSectionLabels> | undefined) {
+    this.L = { ...API_KEYS_SECTION_LABELS_EN, ...(v ?? {}) };
+  }
+  L: ApiKeysSectionLabels = API_KEYS_SECTION_LABELS_EN;
+
   private readonly api = inject(KiModelsApiService);
 
   readonly loading = signal(true);
@@ -295,7 +295,7 @@ export class ApiKeysSectionComponent {
   }
 
   clearKey(k: ApiKeySetting): void {
-    if (!confirm(`Clear DB-stored value for "${k.settingKey}"? (Env fallback may still apply.)`)) return;
+    if (!confirm(this.L.confirmClear(k.settingKey))) return;
     this.clearing.set(k.settingKey);
     this.api.setKey(k.settingKey, { value: '' }).subscribe({
       next: () => {
