@@ -172,13 +172,14 @@ npm i ../ki-models-ui/dist/ki-models-ui/dataclub-ki-models-ui-0.1.0.tgz
 
 ## Roadmap (Plan-File: `~/.claude/plans/was-ist-stand-delightful-wilkinson.md`)
 
-| Phase | Inhalt                                                | Aufwand   |
-|-------|-------------------------------------------------------|-----------|
-| **L.1** | **Skeleton** — Repo, Workspace, leere Components, API-Service, Interfaces, README. **Aktueller Stand.** | ~3h ✓ |
-| L.2   | Components portieren aus EduPro (volle UI: Tabelle, Add-Form, Cooldown, Keys) | ~6-8h |
-| L.3   | EduPro auf Library umstellen                          | ~2h       |
-| L.4   | Switcher von Vanilla auf Angular + Library importieren | ~10-12h   |
-| L.5   | npm-Publish `@dataclub/ki-models-ui` 0.1.0             | ~30min    |
+| Phase | Inhalt                                                | Status   |
+|-------|-------------------------------------------------------|----------|
+| L.1   | Skeleton — Repo, Workspace, Stub-Components, API-Service, Interfaces, README | ✓ |
+| L.2   | Components voll portiert aus EduPro (Tabelle, Add-Form, Cooldown, Keys) | ✓ |
+| L.2b  | `@Input() labels`-Pattern für i18n-Override pro Component | ✓ |
+| L.3   | EduPro auf Library umgestellt (admin „KI-Modelle"-Tab) | ✓ |
+| L.4   | Switcher Vanilla → Angular + Library + Switcher-spezifische Components + SSE | ✓ |
+| L.5   | npm-Publish auf GitHub Packages Registry — siehe [PUBLISHING.md](PUBLISHING.md) | Setup ✓ — Publish manuell |
 
 ---
 
