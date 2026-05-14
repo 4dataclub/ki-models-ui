@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { KI_MODELS_API_BASE } from './ki-models-api.token';
 import { AiModel, AiModelCreate, AiModelUpdate } from '../models/ai-model';
 import { ApiKeySetting, ApiKeySettingUpdate } from '../models/api-key-setting';
@@ -73,8 +73,37 @@ export class KiModelsApiService {
 
   // ─── API-Keys ────────────────────────────────────────────────────────────
 
+  /**
+   * Listet alle API-Key-Settings.
+   *
+   * Akzeptiert zwei Backend-Response-Shapes:
+   * - **Array** (`ApiKeySetting[]`) — was die Library als Vertrag definiert
+   *   (Switcher liefert das direkt unter `/cascade-settings`).
+   * - **Object mit `settings`-Map** — was EduPros bestehender Endpoint
+   *   `/admin/api-keys` liefert (`{settings: {key: {keyMasked, keySource, …}}}`).
+   *
+   * Bei Object-Form werden die Entries in das Array-Format gemapped, damit
+   * die Components homogen mit `ApiKeySetting`-Items arbeiten. Pro Konsument
+   * brauchen wir so keinen eigenen Adapter — die Library normalisiert selbst.
+   */
   listKeys(): Observable<ApiKeySetting[]> {
-    return this.http.get<ApiKeySetting[]>(`${this.base}/api-keys`);
+    return this.http.get<any>(`${this.base}/api-keys`).pipe(
+      map((resp): ApiKeySetting[] => {
+        if (Array.isArray(resp)) return resp;
+        // EduPro-Shape: { settings: { <key>: { keyMasked, keySource, keyConfigured, envVar, isDefault } } }
+        if (resp && typeof resp === 'object' && resp.settings && typeof resp.settings === 'object') {
+          return Object.entries(resp.settings).map(([settingKey, v]: [string, any]) => ({
+            settingKey,
+            valueMasked: v?.keyMasked ?? '',
+            configured: !!v?.keyConfigured,
+            keySource: v?.keySource ?? null,
+            envVar: v?.envVar ?? null,
+            isDefault: !!v?.isDefault,
+          }));
+        }
+        return [];
+      }),
+    );
   }
 
   setKey(settingKey: string, body: ApiKeySettingUpdate): Observable<{ ok: boolean }> {
