@@ -1,4 +1,4 @@
-# Publishing `@dataclub/ki-models-ui`
+# Publishing `@4dataclub/ki-models-ui`
 
 Phase L.5 (2026-05-15): Library auf **GitHub Packages npm Registry** publishen,
 damit EduPro + Switcher den `vendor/`-Tarball-Workaround beseitigen können.
@@ -15,7 +15,7 @@ da). Speichern als z.B. `GITHUB_NPM_TOKEN`.
 
 ```ini
 //npm.pkg.github.com/:_authToken=<TOKEN>
-@dataclub:registry=https://npm.pkg.github.com
+@4dataclub:registry=https://npm.pkg.github.com
 ```
 
 > **Wichtig:** `~/.npmrc` ist user-level — niemals ins Repo committen. Das
@@ -57,12 +57,12 @@ Dann `ng build` + `cd dist/ki-models-ui && npm publish`.
 cd ~/Downloads/ki-projekte/edupro-learning-platform/angular-frontend
 
 # Stelle sicher dass ~/.npmrc dataclub-scope auf GitHub-Registry mappt:
-#   @dataclub:registry=https://npm.pkg.github.com
+#   @4dataclub:registry=https://npm.pkg.github.com
 
 # vendor-Workaround entfernen
 rm -rf vendor
-npm uninstall @dataclub/ki-models-ui
-npm install @dataclub/ki-models-ui@^0.1.0
+npm uninstall @4dataclub/ki-models-ui
+npm install @4dataclub/ki-models-ui@^0.1.0
 
 # Dockerfile-Anpassung: COPY vendor entfernen
 # package.json: file:vendor/... → ^0.1.0 (passiert automatisch durch npm install)
@@ -75,12 +75,12 @@ Analog:
 ```bash
 cd ~/Downloads/ki-projekte/claude-switcher/angular-frontend
 rm -rf vendor
-npm uninstall @dataclub/ki-models-ui
-npm install @dataclub/ki-models-ui@^0.1.0
+npm uninstall @4dataclub/ki-models-ui
+npm install @4dataclub/ki-models-ui@^0.1.0
 ```
 
 Dann beide Repos: Dockerfile `COPY vendor ./vendor` entfernen, package.json
-zeigt nur noch `"@dataclub/ki-models-ui": "^0.1.0"`.
+zeigt nur noch `"@4dataclub/ki-models-ui": "^0.1.0"`.
 
 ## CI/CD-Auto-Publish
 

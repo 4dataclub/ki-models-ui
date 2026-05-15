@@ -14,7 +14,7 @@ npx --yes @angular/cli@17 new angular-frontend --routing --style=css --standalon
 
 ```bash
 cd angular-frontend
-npm i @dataclub/ki-models-ui
+npm i @4dataclub/ki-models-ui
 # (Phase L.5 published auf Registry; erste Iteration via tarball)
 ```
 
@@ -22,7 +22,7 @@ npm i @dataclub/ki-models-ui
 
 ```typescript
 import { provideHttpClient } from '@angular/common/http';
-import { KI_MODELS_API_BASE } from '@dataclub/ki-models-ui';
+import { KI_MODELS_API_BASE } from '@4dataclub/ki-models-ui';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -59,7 +59,7 @@ Switcher hat ZUSÄTZLICH:
 ```
 
 ```typescript
-import { AiModel, ModelsTableComponent, ...} from '@dataclub/ki-models-ui';
+import { AiModel, ModelsTableComponent, ...} from '@4dataclub/ki-models-ui';
 
 @Component({
   /* ... */

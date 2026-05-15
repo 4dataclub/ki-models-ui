@@ -1,5 +1,5 @@
 {
-  "name": "@dataclub/ki-models-ui",
+  "name": "@4dataclub/ki-models-ui",
   "version": "0.1.0",
   "description": "Geteilte Angular-Library für KI-Modell-Admin-UI (EduPro + Switcher). Konsumiert llm-cascade-kompatible Backend-APIs.",
   "repository": {
