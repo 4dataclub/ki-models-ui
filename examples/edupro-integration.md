@@ -6,7 +6,7 @@ Wenn EduPro auf die Library umgestellt wird, sind das die Änderungen:
 
 ```bash
 cd ~/Downloads/ki-projekte/edupro-learning-platform/angular-frontend
-npm i @dataclub/ki-models-ui
+npm i @4dataclub/ki-models-ui
 ```
 
 (Erste Iteration: lokales `npm pack`-Tarball linken. Phase L.5 publishet
@@ -16,7 +16,7 @@ auf eine Registry.)
 
 ```typescript
 import { provideHttpClient } from '@angular/common/http';
-import { KI_MODELS_API_BASE } from '@dataclub/ki-models-ui';
+import { KI_MODELS_API_BASE } from '@4dataclub/ki-models-ui';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -56,7 +56,7 @@ import {
   AddModelFormComponent,
   CascadeCooldownComponent,
   ApiKeysSectionComponent,
-} from '@dataclub/ki-models-ui';
+} from '@4dataclub/ki-models-ui';
 
 @Component({
   imports: [

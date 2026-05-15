@@ -1,4 +1,4 @@
-# @dataclub/ki-models-ui
+# @4dataclub/ki-models-ui
 
 Geteilte **Angular-Library** für die KI-Modell-Admin-UI von EduPro + Switcher.
 Komponenten zur Cascade-Verwaltung, API-Key-Konfiguration und Modell-Tabelle —
@@ -21,7 +21,7 @@ plus Konsumenten-eigene Proxy-Endpoints.
 │   │  ┌───────────────┐  │                       │  ┌──────────────┐  │  │
 │   │  │ <ki-models-   │  │                       │  │ <ki-models-  │  │  │
 │   │  │  table />     │  │                       │  │  table />    │  │  │
-│   │  │ <ki-add-      │  │     @dataclub/        │  │ <ki-add-     │  │  │
+│   │  │ <ki-add-      │  │     @4dataclub/       │  │ <ki-add-     │  │  │
 │   │  │  model-form />│  │     ki-models-ui      │  │  model-form />│ │  │
 │   │  │ <ki-cascade-  │  │ ◄───imports both ────►│  │ <ki-cascade- │  │  │
 │   │  │  cooldown />  │  │                       │  │  cooldown /> │  │  │
@@ -66,7 +66,7 @@ plus Konsumenten-eigene Proxy-Endpoints.
 // app.config.ts (Angular 17 Standalone)
 import { ApplicationConfig } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
-import { KI_MODELS_API_BASE } from '@dataclub/ki-models-ui';
+import { KI_MODELS_API_BASE } from '@4dataclub/ki-models-ui';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -101,7 +101,7 @@ import {
   CascadeCooldownComponent,
   ApiKeysSectionComponent,
   AiModel,
-} from '@dataclub/ki-models-ui';
+} from '@4dataclub/ki-models-ui';
 
 @Component({
   standalone: true,
@@ -165,7 +165,7 @@ npx ng build ki-models-ui
 # Library + lokal in einen Konsumenten linken
 cd dist/ki-models-ui && npm pack
 # Im Konsumenten:
-npm i ../ki-models-ui/dist/ki-models-ui/dataclub-ki-models-ui-0.1.0.tgz
+npm i ../ki-models-ui/dist/ki-models-ui/4dataclub-ki-models-ui-0.1.0.tgz
 ```
 
 ---
