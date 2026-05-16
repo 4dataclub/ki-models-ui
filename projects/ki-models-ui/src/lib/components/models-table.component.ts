@@ -100,7 +100,7 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
                 <button (click)="test(m)" class="ki-btn-secondary">{{ L.btnTest }}</button>
                 <span *ngIf="showActiveAction && isActiveModel(m)" class="ki-badge ki-badge-active">{{ L.activeBadge }}</span>
                 <button
-                  *ngIf="showActiveAction && !isActiveModel(m) && m.enabled && m.keyConfigured && !m.autoDisabled"
+                  *ngIf="showActiveAction && !isActiveModel(m) && m.keyConfigured && !m.autoDisabled"
                   (click)="setActive(m)"
                   class="ki-btn-primary"
                 >{{ L.btnSetActive }}</button>
