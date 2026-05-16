@@ -22,3 +22,4 @@ export * from './lib/components/models-table.component';
 export * from './lib/components/add-model-form.component';
 export * from './lib/components/cascade-cooldown.component';
 export * from './lib/components/api-keys-section.component';
+export * from './lib/components/failover-chain.component';

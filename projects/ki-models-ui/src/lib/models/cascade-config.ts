@@ -30,3 +30,15 @@ export interface FailoverChain {
   /** Reihenfolge der Modell-IDs (`provider:modelId`) in der Chain. */
   modelIds: string[];
 }
+
+/**
+ * Ein einzelner Eintrag in der editierbaren Failover-Chain (von
+ * `<ki-failover-chain>` konsumiert). Die Komponente arbeitet generisch — was
+ * der Konsument mit der geänderten Chain macht (in eine separate Config
+ * schreiben wie Switcher, oder cascade-models CRUD wie EduPro) ist Sache des
+ * Konsumenten.
+ */
+export interface ChainEntry {
+  provider: string;
+  model: string;
+}

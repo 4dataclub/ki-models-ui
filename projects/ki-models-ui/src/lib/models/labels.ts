@@ -168,3 +168,35 @@ export const API_KEYS_SECTION_LABELS_EN: ApiKeysSectionLabels = {
   hint: "Keys are stored in the consumer's settings table and never echoed to clients in plain text. The value is only used server-side to authenticate model calls.",
   confirmClear: (k) => `Clear DB-stored value for "${k}"? (Env fallback may still apply.)`,
 };
+
+/**
+ * Labels für `<ki-failover-chain>`. Konsument kann alle oder einzelne Strings
+ * überschreiben — Defaults sind englisch.
+ */
+export interface FailoverChainLabels {
+  title: string;
+  description: string;
+  addRow: string;
+  removeRowTitle: string;
+  moveUpTitle: string;
+  moveDownTitle: string;
+  currentStep: string;
+  positionLabel: (pos: number, provider: string, model: string) => string;
+  promote: string;
+  hint: string;
+  emptyState: string;
+}
+
+export const FAILOVER_CHAIN_LABELS_EN: FailoverChainLabels = {
+  title: 'Failover Chain',
+  description: 'Order in which models are tried when one hits a quota / 503.',
+  addRow: 'Add stage',
+  removeRowTitle: 'Remove',
+  moveUpTitle: 'Move up',
+  moveDownTitle: 'Move down',
+  currentStep: 'Current stage:',
+  positionLabel: (pos, provider, model) => `Stage ${pos + 1} (${provider} · ${model})`,
+  promote: '↶ Back to stage 1',
+  hint: 'On quota error, the wrapper switches to the next stage and restarts.',
+  emptyState: 'No stages configured. Add one to start.',
+};
