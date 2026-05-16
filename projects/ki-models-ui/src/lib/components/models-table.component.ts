@@ -224,7 +224,7 @@ export class ModelsTableComponent {
 
   readonly loading = signal(true);
   readonly models = signal<AiModel[]>([]);
-  readonly testResult = signal<Record<number, { ok?: boolean; latencyMs?: number; error?: string; pending?: boolean }>>({});
+  readonly testResult = signal<Record<number, { ok?: boolean; latencyMs?: number; error?: string; pending?: boolean; skipped?: boolean }>>({});
 
   ngOnInit(): void {
     this.reload();
@@ -281,8 +281,13 @@ export class ModelsTableComponent {
     this.api.testModel(m.id).subscribe({
       next: (r) => {
         this.setTest(m.id, r);
-        if (m.enabled && r.ok === false) {
-          // Auto-disable bei Test-Fail (analog EduPro)
+        // Auto-disable nur bei *echten* Failed-Tests (Modell antwortet falsch
+        // oder gar nicht). Wenn der Konsument-Backend den Test bewusst
+        // übersprungen hat (`skipped: true`), ist das KEIN Grund das Modell
+        // auto-zu-deaktivieren — z.B. Switcher kurzschließt den Anthropic-Test
+        // wenn kein API-Key da ist, weil Max-OAuth den Live-Switch trotzdem
+        // erlaubt. Das Modell ist nutzbar, nur nicht testbar.
+        if (m.enabled && r.ok === false && r.skipped !== true) {
           this.api.toggleModel(m.id, false).subscribe(() => this.reload());
         }
       },

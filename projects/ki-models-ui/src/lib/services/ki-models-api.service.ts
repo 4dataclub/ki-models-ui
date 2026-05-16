@@ -53,8 +53,14 @@ export class KiModelsApiService {
     return this.http.delete<{ ok: boolean }>(`${this.base}/ai-models/${id}`);
   }
 
-  testModel(id: number): Observable<{ ok: boolean; latencyMs?: number; error?: string }> {
-    return this.http.post<{ ok: boolean; latencyMs?: number; error?: string }>(
+  /**
+   * `skipped: true` zeigt an, dass das Konsument-Backend den Test bewusst
+   * übersprungen hat (z.B. Switcher beim Anthropic-Modell ohne API-Key, weil
+   * Max-OAuth den Live-Switch erlaubt aber kein API-Test möglich ist). Die
+   * Tabelle deaktiviert das Modell in dem Fall NICHT auto.
+   */
+  testModel(id: number): Observable<{ ok: boolean; latencyMs?: number; error?: string; skipped?: boolean }> {
+    return this.http.post<{ ok: boolean; latencyMs?: number; error?: string; skipped?: boolean }>(
       `${this.base}/ai-models/${id}/test`,
       {},
     );
