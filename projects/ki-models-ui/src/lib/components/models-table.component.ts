@@ -98,6 +98,12 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
                 <button (click)="move(i, -1)" [disabled]="i === 0" class="ki-btn-icon">↑</button>
                 <button (click)="move(i, 1)" [disabled]="i === models().length - 1" class="ki-btn-icon">↓</button>
                 <button (click)="test(m)" class="ki-btn-secondary">{{ L.btnTest }}</button>
+                <span *ngIf="showActiveAction && isActiveModel(m)" class="ki-badge ki-badge-active">{{ L.activeBadge }}</span>
+                <button
+                  *ngIf="showActiveAction && !isActiveModel(m) && m.enabled && m.keyConfigured && !m.autoDisabled"
+                  (click)="setActive(m)"
+                  class="ki-btn-primary"
+                >{{ L.btnSetActive }}</button>
                 <button *ngIf="m.autoDisabled" (click)="reEnable(m)" class="ki-btn-warn">{{ L.btnReenable }}</button>
                 <button (click)="remove(m)" class="ki-btn-danger">{{ L.btnDelete }}</button>
               </td>
@@ -171,8 +177,20 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
     .ki-btn-icon { background: #f1f5f9; color: #1e293b; }
     .ki-btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
     .ki-btn-secondary { background: #e0e7ff; color: #3730a3; }
+    .ki-btn-primary  { background: #10b981; color: white; }
     .ki-btn-warn { background: #fef3c7; color: #92400e; }
     .ki-btn-danger { background: #fee2e2; color: #991b1b; }
+    .ki-btn-icon, .ki-btn-secondary, .ki-btn-primary, .ki-btn-warn, .ki-btn-danger {
+      padding: 0.25rem 0.6rem;
+      border-radius: 0.375rem;
+      font-size: 0.625rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: none;
+      cursor: pointer;
+    }
+    .ki-badge-active { background: #d1fae5; color: #065f46; border: 1px solid #10b981; }
     .ki-ok { color: #059669; font-weight: 700; }
     .ki-cooldown { color: #d97706; font-weight: 700; }
     .ki-error { color: #dc2626; font-weight: 700; }
@@ -187,6 +205,20 @@ export class ModelsTableComponent {
     this.L = { ...MODELS_TABLE_LABELS_EN, ...(v ?? {}) };
   }
   L: ModelsTableLabels = MODELS_TABLE_LABELS_EN;
+
+  /**
+   * Aktiviert pro Modell-Zeile den „Als aktiv setzen"-Button (`btnSetActive`).
+   * Default `false` — EduPro nutzt das nicht, Switcher schaltet's auf `true`.
+   * Wenn das Modell bereits aktiv ist (siehe `activeModelId`), zeigt sich
+   * stattdessen das AKTIV-Badge.
+   */
+  @Input() showActiveAction = false;
+
+  /**
+   * Aktive Modell-ID (`modelId`-Feld, nicht die DB-id). Wird mit jeder Zeile
+   * verglichen um die AKTIV-Badge zu setzen. `null` = kein Modell aktiv.
+   */
+  @Input() activeModelId: string | null = null;
 
   private readonly api = inject(KiModelsApiService);
 
@@ -259,6 +291,21 @@ export class ModelsTableComponent {
         if (m.enabled) this.api.toggleModel(m.id, false).subscribe(() => this.reload());
       },
     });
+  }
+
+  /**
+   * „Als aktiv setzen"-Klick — emittet `activeModelChanged`. Der Konsument
+   * (z.B. Switcher) entscheidet was passiert: typisch ist ein `/api/switch`
+   * mit `{provider, modelId}` damit der Wrapper Claude Code mit dem neuen
+   * Provider neu startet.
+   */
+  setActive(m: AiModel): void {
+    this.activeModelChanged.emit(m);
+  }
+
+  /** True wenn die Zeile zum `activeModelId`-Input passt. */
+  isActiveModel(m: AiModel): boolean {
+    return !!this.activeModelId && m.modelId === this.activeModelId;
   }
 
   truncate(s: string, n: number): string {
