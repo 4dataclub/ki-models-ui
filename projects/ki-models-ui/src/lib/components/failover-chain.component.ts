@@ -56,7 +56,7 @@ import { FailoverChainLabels, FAILOVER_CHAIN_LABELS_EN } from '../models/labels'
             (change)="onProviderChange(i)"
             class="flex-1 min-w-0 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-sm text-slate-900 dark:text-slate-100"
           >
-            <option *ngFor="let p of availableProviders" [value]="p.value">{{ p.label }}</option>
+            <option *ngFor="let p of validProviders()" [value]="p.value">{{ p.label }}</option>
           </select>
           <select
             [(ngModel)]="row.model"
@@ -92,7 +92,8 @@ import { FailoverChainLabels, FAILOVER_CHAIN_LABELS_EN } from '../models/labels'
       <button
         type="button"
         (click)="addRow()"
-        class="mt-3 px-3 py-1.5 text-xs font-bold rounded-lg border border-dashed border-slate-400 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-950 dark:hover:border-slate-50 hover:text-slate-950 dark:hover:text-slate-50 transition"
+        [disabled]="availableModels.length === 0"
+        class="mt-3 px-3 py-1.5 text-xs font-bold rounded-lg border border-dashed border-slate-400 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-950 dark:hover:border-slate-50 hover:text-slate-950 dark:hover:text-slate-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-slate-400 disabled:hover:text-slate-600 transition"
       >+ {{ L.addRow }}</button>
 
       <div *ngIf="showChainPosition" class="flex items-center gap-3 mt-4 pt-3 border-t border-dashed border-slate-300 dark:border-slate-700">
@@ -145,6 +146,22 @@ export class FailoverChainComponent {
     return this.availableModels.filter((m) => m.provider === provider);
   }
 
+  /**
+   * Filtere `availableProviders` auf Provider, die mind. EIN `availableModels`-
+   * Eintrag haben. Verhindert dass User Provider-Werte aus dem Dropdown picken,
+   * für die kein Modell konfiguriert ist (würde sonst beim Aktivieren in einen
+   * „kein Provider-Bean"-Backend-Fehler laufen).
+   *
+   * Beispiel EduPro (cascade-Namensraum): hat nur Modelle mit `provider:'gemini'`
+   * → Dropdown zeigt nur „Google AI Studio". Selbst wenn der Konsument
+   * `availableProviders` mit `[anthropic, google, openrouter]` overridet,
+   * werden Optionen ohne Modelle ausgeblendet.
+   */
+  validProviders(): { value: string; label: string }[] {
+    const have = new Set(this.availableModels.map((m) => m.provider));
+    return this.availableProviders.filter((p) => have.has(p.value));
+  }
+
   onProviderChange(idx: number): void {
     // Beim Provider-Wechsel: Modell auf erstes verfügbares des neuen Providers setzen.
     const first = this.modelsFor(this.chain[idx].provider)[0];
@@ -152,11 +169,17 @@ export class FailoverChainComponent {
     this.emit();
   }
 
+  /**
+   * Neue Chain-Stufe = erstes `availableModels`-Eintrag (garantiert valider
+   * Provider+Modell). Vorher: erster Provider aus `availableProviders` + erstes
+   * seiner Modelle — konnte aber leer sein wenn der Provider keine Modelle
+   * hatte (z.B. EduPro: Default-Provider „anthropic" aber nur ein gemini-Modell
+   * konfiguriert → leeres `model:''` → cascade-Create-Call mit ungültigem Body).
+   */
   addRow(): void {
-    // Default-Provider: erster aus availableProviders. Default-Modell: erstes seiner Modelle.
-    const firstProvider = this.availableProviders[0]?.value ?? 'anthropic';
-    const firstModel = this.modelsFor(firstProvider)[0]?.modelId ?? '';
-    this.chain = [...this.chain, { provider: firstProvider, model: firstModel }];
+    const first = this.availableModels[0];
+    if (!first) return; // Empty cascade — button sollte disabled sein
+    this.chain = [...this.chain, { provider: first.provider, model: first.modelId }];
     this.emit();
   }
 
