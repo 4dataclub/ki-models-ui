@@ -63,7 +63,7 @@ import { FailoverChainLabels, FAILOVER_CHAIN_LABELS_EN } from '../models/labels'
             (change)="emit()"
             class="flex-1 min-w-0 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-sm text-slate-900 dark:text-slate-100"
           >
-            <option *ngFor="let m of modelsFor(row.provider)" [value]="m.modelId">{{ m.displayName }}</option>
+            <option *ngFor="let m of modelsForRow(row.provider, i)" [value]="m.modelId">{{ m.displayName }}</option>
           </select>
           <button
             type="button"
@@ -92,7 +92,7 @@ import { FailoverChainLabels, FAILOVER_CHAIN_LABELS_EN } from '../models/labels'
       <button
         type="button"
         (click)="addRow()"
-        [disabled]="availableModels.length === 0"
+        [disabled]="!canAdd()"
         class="mt-3 px-3 py-1.5 text-xs font-bold rounded-lg border border-dashed border-slate-400 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-950 dark:hover:border-slate-50 hover:text-slate-950 dark:hover:text-slate-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-slate-400 disabled:hover:text-slate-600 transition"
       >+ {{ L.addRow }}</button>
 
@@ -147,6 +147,25 @@ export class FailoverChainComponent {
   }
 
   /**
+   * Wie {@link modelsFor}, aber zusätzlich gefiltert auf Modelle, die NICHT
+   * bereits in einer ANDEREN Chain-Zeile ausgewählt sind. Verhindert, dass
+   * der User das gleiche `{provider, model}`-Paar mehrfach in die Chain
+   * packt — würde im Konsumenten-Diff (z.B. EduPros `onFailoverChainChanged`)
+   * zu Mehrdeutigkeit führen (welche Zeile gehört zu welchem cascade-Modell)
+   * und den vorherigen Inhaber implizit löschen.
+   */
+  modelsForRow(provider: string, rowIdx: number): { modelId: string; displayName: string }[] {
+    const blocked = new Set<string>();
+    for (let j = 0; j < this.chain.length; j++) {
+      if (j === rowIdx) continue;
+      blocked.add(`${this.chain[j].provider}|${this.chain[j].model}`);
+    }
+    return this.availableModels
+      .filter((m) => m.provider === provider)
+      .filter((m) => !blocked.has(`${m.provider}|${m.modelId}`));
+  }
+
+  /**
    * Filtere `availableProviders` auf Provider, die mind. EIN `availableModels`-
    * Eintrag haben. Verhindert dass User Provider-Werte aus dem Dropdown picken,
    * für die kein Modell konfiguriert ist (würde sonst beim Aktivieren in einen
@@ -163,22 +182,32 @@ export class FailoverChainComponent {
   }
 
   onProviderChange(idx: number): void {
-    // Beim Provider-Wechsel: Modell auf erstes verfügbares des neuen Providers setzen.
-    const first = this.modelsFor(this.chain[idx].provider)[0];
+    // Beim Provider-Wechsel: Modell auf erstes verfügbares des neuen Providers
+    // setzen, das nicht bereits in einer anderen Zeile steht.
+    const first = this.modelsForRow(this.chain[idx].provider, idx)[0];
     if (first) this.chain[idx].model = first.modelId;
     this.emit();
   }
 
   /**
-   * Neue Chain-Stufe = erstes `availableModels`-Eintrag (garantiert valider
-   * Provider+Modell). Vorher: erster Provider aus `availableProviders` + erstes
-   * seiner Modelle — konnte aber leer sein wenn der Provider keine Modelle
-   * hatte (z.B. EduPro: Default-Provider „anthropic" aber nur ein gemini-Modell
-   * konfiguriert → leeres `model:''` → cascade-Create-Call mit ungültigem Body).
+   * True wenn es noch ein verfügbares Modell gibt, das NICHT bereits in der
+   * Chain steht. Steuert das Disabled-State des „+ Stufe"-Buttons — verhindert
+   * Klick-Versuche die sonst ein Duplikat (oder keinen Row) erzeugen würden.
+   */
+  canAdd(): boolean {
+    if (this.availableModels.length === 0) return false;
+    const inChain = new Set(this.chain.map((r) => `${r.provider}|${r.model}`));
+    return this.availableModels.some((m) => !inChain.has(`${m.provider}|${m.modelId}`));
+  }
+
+  /**
+   * Neue Chain-Stufe = erstes `availableModels`-Eintrag, der noch NICHT in der
+   * Chain ist. Verhindert Duplikate beim Klick auf „+ Stufe".
    */
   addRow(): void {
-    const first = this.availableModels[0];
-    if (!first) return; // Empty cascade — button sollte disabled sein
+    const inChain = new Set(this.chain.map((r) => `${r.provider}|${r.model}`));
+    const first = this.availableModels.find((m) => !inChain.has(`${m.provider}|${m.modelId}`));
+    if (!first) return; // Alles schon in Chain — Button sollte disabled sein
     this.chain = [...this.chain, { provider: first.provider, model: first.modelId }];
     this.emit();
   }
