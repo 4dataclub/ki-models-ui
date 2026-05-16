@@ -27,6 +27,10 @@ export interface ModelsTableLabels {
   btnTest: string;
   btnReenable: string;
   btnDelete: string;
+  /** „Als aktiv setzen" — nur sichtbar wenn `[showActiveAction]="true"`. */
+  btnSetActive: string;
+  /** Badge-Text für die Zeile des aktiven Modells. */
+  activeBadge: string;
   confirmDelete: (modelId: string) => string;
 }
 
@@ -51,6 +55,8 @@ export const MODELS_TABLE_LABELS_EN: ModelsTableLabels = {
   btnTest: 'Test',
   btnReenable: 'Re-enable',
   btnDelete: 'Delete',
+  btnSetActive: 'Use now',
+  activeBadge: 'ACTIVE',
   confirmDelete: (id) => `Delete model "${id}"?`,
 };
 
