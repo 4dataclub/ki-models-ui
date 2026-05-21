@@ -1,3 +1,9 @@
+/** Routing-Kategorien für zweistufiges Cascade-Routing (Phase R). */
+export type AiModelCategory = 'utility' | 'content' | 'general';
+
+/** Alle UI-relevanten Kategorien in Anzeige-Reihenfolge (Tabelle gruppiert oben → unten). */
+export const AI_MODEL_CATEGORIES: AiModelCategory[] = ['utility', 'content', 'general'];
+
 /**
  * Ein KI-Modell in der Cascade. Felder spiegeln die llm-cascade API +
  * konsumentenspezifische Erweiterungen.
@@ -14,6 +20,15 @@ export interface AiModel {
 
   /** Optional: Anzeigename in der UI. Wenn leer, wird `provider:modelId` gerendert. */
   displayName?: string | null;
+
+  /**
+   * Routing-Kategorie für zweistufige Cascade (Phase R, llm-cascade ≥ 0.3.0):
+   *   - `utility` : i18n, Audits, Verifier (günstige/freie Modelle bevorzugt).
+   *   - `content` : Lehrinhalte, Prüfungen, Chat (Qualitäts-Modelle).
+   *   - `general` : Fallback, in beiden Cascades sichtbar.
+   *   - `undefined`/leer : Backward-Compat — wird vom Backend als "general" behandelt.
+   */
+  category?: AiModelCategory;
 
   /** Settings-Key unter dem der API-Key liegt. Default: `<provider>ApiKey`. */
   apiKeySettingKey: string;
@@ -48,6 +63,7 @@ export interface AiModelCreate {
   provider: string;
   modelId: string;
   displayName?: string;
+  category?: AiModelCategory;
   apiKeySettingKey?: string;
   enabled?: boolean;
   orderIdx?: number;
