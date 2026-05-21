@@ -2,7 +2,7 @@ import { Component, EventEmitter, Input, Output, inject, signal } from '@angular
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { KiModelsApiService } from '../services/ki-models-api.service';
-import { AiModel, AiModelCreate } from '../models/ai-model';
+import { AiModel, AiModelCategory, AiModelCreate } from '../models/ai-model';
 import { ApiKeySetting } from '../models/api-key-setting';
 import { AddModelFormLabels, ADD_MODEL_FORM_LABELS_EN } from '../models/labels';
 
@@ -55,6 +55,13 @@ import { AddModelFormLabels, ADD_MODEL_FORM_LABELS_EN } from '../models/labels';
           <option *ngFor="let k of keyOptions()" [value]="k.settingKey">
             {{ k.settingKey }} {{ k.configured ? '✓' : '' }}
           </option>
+        </select>
+
+        <select [(ngModel)]="category"
+                name="category"
+                class="ki-input"
+                [attr.aria-label]="L.fieldCategory">
+          <option *ngFor="let c of L.categoryOptions" [value]="c.value">{{ c.label }}</option>
         </select>
 
         <input [(ngModel)]="displayName"
@@ -132,6 +139,8 @@ export class AddModelFormComponent {
   modelId = '';
   apiKeySettingKey = 'geminiApiKey';
   displayName = '';
+  /** Default content — neue Gemini-Modelle sind typischerweise Content. */
+  category: AiModelCategory = 'content';
   cooldown503OverrideSec: number | null = null;
 
   readonly submitting = signal(false);
@@ -144,7 +153,26 @@ export class AddModelFormComponent {
     anthropic:     'anthropicApiKey',
     openrouter:    'openrouterApiKey',
     deepseek:      'deepseekApiKey',
+    ollama:        'ollamaApiKey',
     openai_compat: 'customApiKey',
+  };
+
+  /**
+   * Default-Kategorie pro Provider — heuristisch, weil typische Use-Cases klar
+   * sind. User kann immer überschreiben.
+   *   gemini       → content (Lehrmaterial, hochwertige Generierung)
+   *   ollama       → utility (lokal, billig, gut für Übersetzungen)
+   *   openrouter   → general (Mischbestand, oft Fallback)
+   *   andere       → general
+   */
+  private readonly defaultCategory: Record<string, AiModelCategory> = {
+    gemini:        'content',
+    openai:        'content',
+    anthropic:     'content',
+    openrouter:    'general',
+    deepseek:      'utility',
+    ollama:        'utility',
+    openai_compat: 'general',
   };
 
   private readonly modelIdSuggestionsByProvider: Record<string, string[]> = {
@@ -154,6 +182,12 @@ export class AddModelFormComponent {
       'gemini-2.5-pro',
       'gemini-3-flash-preview',
       'gemini-3-pro-preview',
+    ],
+    ollama: [
+      'gemma3:4b',
+      'gemma3:12b',
+      'qwen2.5:7b',
+      'llama3.2:3b',
     ],
     openai: [
       'gpt-4o',
@@ -193,6 +227,8 @@ export class AddModelFormComponent {
   onProviderChange(): void {
     const def = this.defaultSettingKey[this.provider];
     if (def) this.apiKeySettingKey = def;
+    const cat = this.defaultCategory[this.provider];
+    if (cat) this.category = cat;
   }
 
   modelIdSuggestions(): string[] {
@@ -220,6 +256,7 @@ export class AddModelFormComponent {
       modelId: this.modelId.trim(),
       apiKeySettingKey: this.apiKeySettingKey.trim(),
       displayName: this.displayName?.trim() || undefined,
+      category: this.category,
       cooldown503OverrideSec: this.cooldown503OverrideSec,
     };
     this.api.createModel(body).subscribe({

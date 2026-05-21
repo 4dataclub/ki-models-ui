@@ -1,7 +1,7 @@
-import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { KiModelsApiService } from '../services/ki-models-api.service';
-import { AiModel } from '../models/ai-model';
+import { AiModel, AiModelCategory, AI_MODEL_CATEGORIES } from '../models/ai-model';
 import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
 
 /**
@@ -37,85 +37,114 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
         {{ L.empty }}
       </div>
 
-      <div *ngIf="models().length > 0" class="ki-table-wrap">
-        <table class="ki-table">
-          <thead>
-            <tr>
-              <th>{{ L.colNum }}</th>
-              <th>{{ L.colProvider }}</th>
-              <th>{{ L.colModelId }}</th>
-              <th>{{ L.colKey }}</th>
-              <th>{{ L.colEnabled }}</th>
-              <th>{{ L.colStatus }}</th>
-              <th class="ki-right">{{ L.colActions }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let m of models(); let i = index"
-                [class.ki-row-auto-disabled]="m.autoDisabled">
-              <td class="ki-mono ki-muted">{{ i + 1 }}</td>
-              <td class="ki-mono ki-provider">{{ m.provider }}</td>
-              <td class="ki-mono">
-                <strong>{{ m.modelId }}</strong>
-                <div *ngIf="m.displayName" class="ki-muted ki-tiny">{{ m.displayName }}</div>
-              </td>
-              <td>
-                <span *ngIf="m.keyConfigured" class="ki-badge ki-badge-ok">{{ L.keySet }}</span>
-                <span *ngIf="!m.keyConfigured" class="ki-badge ki-badge-warn">{{ L.keyMissing }}</span>
-                <div class="ki-tiny ki-mono ki-muted">{{ m.apiKeySettingKey }}</div>
-              </td>
-              <td>
-                <button *ngIf="!m.autoDisabled"
-                        (click)="toggle(m)"
-                        [disabled]="!m.enabled && !m.keyConfigured"
-                        [title]="(!m.enabled && !m.keyConfigured) ? L.toggleNeedsKey : ''"
-                        class="ki-toggle"
-                        [class.ki-toggle-on]="m.enabled"
-                        [class.ki-toggle-off]="!m.enabled">
-                  {{ m.enabled ? L.on : L.off }}
-                </button>
-                <span *ngIf="m.autoDisabled" class="ki-badge ki-badge-error">🚫 {{ L.autoDisabled }}</span>
-              </td>
-              <td>
-                <span *ngIf="m.autoDisabled" class="ki-tiny ki-error" [title]="m.autoDisabledReason || ''">
-                  {{ truncate(m.autoDisabledReason || '', 60) }}
-                </span>
-                <span *ngIf="!m.autoDisabled && (m.cooldownRemainingSec ?? 0) > 0" class="ki-tiny ki-cooldown">
-                  cd {{ m.cooldownRemainingSec }}s
-                </span>
-                <span *ngIf="!m.autoDisabled && !(m.cooldownRemainingSec ?? 0)" class="ki-tiny ki-ok">
-                  {{ L.free }}
-                </span>
-                <div *ngIf="testResult()[m.id] as r" class="ki-tiny ki-mono"
-                     [class.ki-ok]="r.ok"
-                     [class.ki-error]="!r.ok && !r.pending">
-                  <span *ngIf="r.pending">…</span>
-                  <span *ngIf="r.ok">✓ {{ r.latencyMs }}ms</span>
-                  <span *ngIf="!r.ok && !r.pending">✗ {{ truncate(r.error || '', 80) }}</span>
-                </div>
-              </td>
-              <td class="ki-right ki-actions">
-                <button (click)="move(i, -1)" [disabled]="i === 0" class="ki-btn-icon">↑</button>
-                <button (click)="move(i, 1)" [disabled]="i === models().length - 1" class="ki-btn-icon">↓</button>
-                <button (click)="test(m)" class="ki-btn-secondary">{{ L.btnTest }}</button>
-                <span *ngIf="showActiveAction && isActiveModel(m)" class="ki-badge ki-badge-active">{{ L.activeBadge }}</span>
-                <button
-                  *ngIf="showActiveAction && !isActiveModel(m) && m.keyConfigured && !m.autoDisabled"
-                  (click)="setActive(m)"
-                  class="ki-btn-primary"
-                >{{ L.btnSetActive }}</button>
-                <button *ngIf="m.autoDisabled" (click)="reEnable(m)" class="ki-btn-warn">{{ L.btnReenable }}</button>
-                <button (click)="remove(m)" class="ki-btn-danger">{{ L.btnDelete }}</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Phase R: Gruppierte Ansicht nach Routing-Kategorie. Jede Section
+           rendert ihre eigene Tabelle. Reorder (Pfeile) ist innerhalb einer
+           Kategorie scoped — globaler orderIdx wird im Hintergrund neu
+           vergeben, aber Cross-Kategorie-Swap ist nicht erlaubt. -->
+      <div *ngIf="models().length > 0">
+        <section *ngFor="let cat of categoriesWithModels()" class="ki-category-section">
+          <header class="ki-category-header">
+            <h4 class="ki-category-title">{{ categoryTitle(cat) }}</h4>
+            <p class="ki-category-hint">{{ categoryHint(cat) }}</p>
+          </header>
+
+          <div class="ki-table-wrap">
+            <table class="ki-table">
+              <thead>
+                <tr>
+                  <th>{{ L.colNum }}</th>
+                  <th>{{ L.colProvider }}</th>
+                  <th>{{ L.colModelId }}</th>
+                  <th>{{ L.colKey }}</th>
+                  <th>{{ L.colEnabled }}</th>
+                  <th>{{ L.colStatus }}</th>
+                  <th class="ki-right">{{ L.colActions }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let m of modelsByCategory()[cat]; let i = index"
+                    [class.ki-row-auto-disabled]="m.autoDisabled">
+                  <td class="ki-mono ki-muted">{{ i + 1 }}</td>
+                  <td class="ki-mono ki-provider">{{ m.provider }}</td>
+                  <td class="ki-mono">
+                    <strong>{{ m.modelId }}</strong>
+                    <div *ngIf="m.displayName" class="ki-muted ki-tiny">{{ m.displayName }}</div>
+                  </td>
+                  <td>
+                    <span *ngIf="m.keyConfigured" class="ki-badge ki-badge-ok">{{ L.keySet }}</span>
+                    <span *ngIf="!m.keyConfigured" class="ki-badge ki-badge-warn">{{ L.keyMissing }}</span>
+                    <div class="ki-tiny ki-mono ki-muted">{{ m.apiKeySettingKey }}</div>
+                  </td>
+                  <td>
+                    <button *ngIf="!m.autoDisabled"
+                            (click)="toggle(m)"
+                            [disabled]="!m.enabled && !m.keyConfigured"
+                            [title]="(!m.enabled && !m.keyConfigured) ? L.toggleNeedsKey : ''"
+                            class="ki-toggle"
+                            [class.ki-toggle-on]="m.enabled"
+                            [class.ki-toggle-off]="!m.enabled">
+                      {{ m.enabled ? L.on : L.off }}
+                    </button>
+                    <span *ngIf="m.autoDisabled" class="ki-badge ki-badge-error">🚫 {{ L.autoDisabled }}</span>
+                  </td>
+                  <td>
+                    <span *ngIf="m.autoDisabled" class="ki-tiny ki-error" [title]="m.autoDisabledReason || ''">
+                      {{ truncate(m.autoDisabledReason || '', 60) }}
+                    </span>
+                    <span *ngIf="!m.autoDisabled && (m.cooldownRemainingSec ?? 0) > 0" class="ki-tiny ki-cooldown">
+                      cd {{ m.cooldownRemainingSec }}s
+                    </span>
+                    <span *ngIf="!m.autoDisabled && !(m.cooldownRemainingSec ?? 0)" class="ki-tiny ki-ok">
+                      {{ L.free }}
+                    </span>
+                    <div *ngIf="testResult()[m.id] as r" class="ki-tiny ki-mono"
+                         [class.ki-ok]="r.ok"
+                         [class.ki-error]="!r.ok && !r.pending">
+                      <span *ngIf="r.pending">…</span>
+                      <span *ngIf="r.ok">✓ {{ r.latencyMs }}ms</span>
+                      <span *ngIf="!r.ok && !r.pending">✗ {{ truncate(r.error || '', 80) }}</span>
+                    </div>
+                  </td>
+                  <td class="ki-right ki-actions">
+                    <button (click)="moveInCategory(cat, i, -1)"
+                            [disabled]="i === 0"
+                            class="ki-btn-icon">↑</button>
+                    <button (click)="moveInCategory(cat, i, 1)"
+                            [disabled]="i === modelsByCategory()[cat].length - 1"
+                            class="ki-btn-icon">↓</button>
+                    <button (click)="test(m)" class="ki-btn-secondary">{{ L.btnTest }}</button>
+                    <span *ngIf="showActiveAction && isActiveModel(m)" class="ki-badge ki-badge-active">{{ L.activeBadge }}</span>
+                    <button
+                      *ngIf="showActiveAction && !isActiveModel(m) && m.keyConfigured && !m.autoDisabled"
+                      (click)="setActive(m)"
+                      class="ki-btn-primary"
+                    >{{ L.btnSetActive }}</button>
+                    <button *ngIf="m.autoDisabled" (click)="reEnable(m)" class="ki-btn-warn">{{ L.btnReenable }}</button>
+                    <button (click)="remove(m)" class="ki-btn-danger">{{ L.btnDelete }}</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </div>
   `,
   styles: [`
     .ki-models-table { font-family: inherit; }
     .ki-models-table-header { display: flex; justify-content: flex-end; margin-bottom: 0.75rem; }
+    .ki-category-section { margin-bottom: 2rem; }
+    .ki-category-section:last-child { margin-bottom: 0; }
+    .ki-category-header { margin-bottom: 0.5rem; }
+    .ki-category-title {
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #1e293b;
+      margin: 0 0 0.15rem 0;
+    }
+    .ki-category-hint { font-size: 0.7rem; color: #64748b; margin: 0; }
     .ki-muted { color: #888; }
     .ki-tiny { font-size: 0.7rem; }
     .ki-mono { font-family: ui-monospace, monospace; }
@@ -226,6 +255,35 @@ export class ModelsTableComponent {
   readonly models = signal<AiModel[]>([]);
   readonly testResult = signal<Record<number, { ok?: boolean; latencyMs?: number; error?: string; pending?: boolean; skipped?: boolean }>>({});
 
+  /** Modelle gruppiert nach Kategorie. null/undefined → 'general'. */
+  readonly modelsByCategory = computed<Record<AiModelCategory, AiModel[]>>(() => {
+    const buckets: Record<AiModelCategory, AiModel[]> = { utility: [], content: [], general: [] };
+    for (const m of this.models()) {
+      const cat: AiModelCategory = (m.category && (AI_MODEL_CATEGORIES as string[]).includes(m.category))
+        ? m.category : 'general';
+      buckets[cat].push(m);
+    }
+    return buckets;
+  });
+
+  /** Kategorien die mindestens 1 Modell enthalten — leere Sections werden ausgeblendet. */
+  readonly categoriesWithModels = computed<AiModelCategory[]>(() => {
+    const by = this.modelsByCategory();
+    return AI_MODEL_CATEGORIES.filter(c => by[c].length > 0);
+  });
+
+  categoryTitle(c: AiModelCategory): string {
+    return c === 'utility' ? this.L.categoryUtility
+      : c === 'content'    ? this.L.categoryContent
+                            : this.L.categoryGeneral;
+  }
+
+  categoryHint(c: AiModelCategory): string {
+    return c === 'utility' ? this.L.categoryUtilityHint
+      : c === 'content'    ? this.L.categoryContentHint
+                            : this.L.categoryGeneralHint;
+  }
+
   ngOnInit(): void {
     this.reload();
   }
@@ -272,6 +330,31 @@ export class ModelsTableComponent {
     ordered.splice(target, 0, moved);
     this.api.reorderModels(ordered.map((m) => m.id)).subscribe(() => {
       this.modelChanged.emit(moved);
+      this.reload();
+    });
+  }
+
+  /**
+   * Move innerhalb einer Kategorie: tauscht zwei kategoriegleiche Modelle in der
+   * globalen `orderIdx`-Liste. Cross-Kategorie-Swap nicht möglich (Buttons
+   * sind am Ende der Kategorie disabled). Globale Reihenfolge bleibt stabil,
+   * nur die zwei Positionen werden gewechselt.
+   */
+  moveInCategory(cat: AiModelCategory, idxInCat: number, dir: -1 | 1): void {
+    const subset = this.modelsByCategory()[cat];
+    const target = idxInCat + dir;
+    if (target < 0 || target >= subset.length) return;
+    const movedModel = subset[idxInCat];
+    const swapModel  = subset[target];
+
+    const ordered = [...this.models()];
+    const movedGlobalIdx = ordered.findIndex(m => m.id === movedModel.id);
+    const swapGlobalIdx  = ordered.findIndex(m => m.id === swapModel.id);
+    if (movedGlobalIdx < 0 || swapGlobalIdx < 0) return;
+    [ordered[movedGlobalIdx], ordered[swapGlobalIdx]] = [ordered[swapGlobalIdx], ordered[movedGlobalIdx]];
+
+    this.api.reorderModels(ordered.map(m => m.id)).subscribe(() => {
+      this.modelChanged.emit(movedModel);
       this.reload();
     });
   }

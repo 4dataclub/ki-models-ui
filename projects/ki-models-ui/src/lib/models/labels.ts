@@ -16,6 +16,7 @@ export interface ModelsTableLabels {
   colKey: string;
   colEnabled: string;
   colStatus: string;
+  colCategory: string;
   colActions: string;
   keySet: string;
   keyMissing: string;
@@ -31,6 +32,14 @@ export interface ModelsTableLabels {
   btnSetActive: string;
   /** Badge-Text für die Zeile des aktiven Modells. */
   activeBadge: string;
+  /** Kategorie-Sektion-Überschriften (Phase R). */
+  categoryUtility: string;
+  categoryContent: string;
+  categoryGeneral: string;
+  /** Sub-Beschreibung pro Kategorie (kleine graue Zeile unter dem Header). */
+  categoryUtilityHint: string;
+  categoryContentHint: string;
+  categoryGeneralHint: string;
   confirmDelete: (modelId: string) => string;
 }
 
@@ -44,6 +53,7 @@ export const MODELS_TABLE_LABELS_EN: ModelsTableLabels = {
   colKey: 'Key',
   colEnabled: 'Enabled',
   colStatus: 'Status',
+  colCategory: 'Category',
   colActions: 'Actions',
   keySet: 'Key set',
   keyMissing: 'Key missing',
@@ -57,6 +67,12 @@ export const MODELS_TABLE_LABELS_EN: ModelsTableLabels = {
   btnDelete: 'Delete',
   btnSetActive: 'Use now',
   activeBadge: 'ACTIVE',
+  categoryUtility: 'Utility',
+  categoryContent: 'Content',
+  categoryGeneral: 'General (fallback)',
+  categoryUtilityHint: 'Translations, audits, verifier — cheap/free models preferred.',
+  categoryContentHint: 'Lesson content, exams, chat — quality matters.',
+  categoryGeneralHint: 'Used in both cascades when category-specific models are exhausted.',
   confirmDelete: (id) => `Delete model "${id}"?`,
 };
 
@@ -65,6 +81,7 @@ export interface AddModelFormLabels {
   fieldModelId: string;
   fieldApiKeySettingKey: string;
   fieldDisplayName: string;
+  fieldCategory: string;
   fieldCooldownOverride: string;
   btnAdd: string;
   btnAdding: string;
@@ -72,6 +89,7 @@ export interface AddModelFormLabels {
   errorRequired: string;
   errorFailed: string;
   providerOptions: { value: string; label: string }[];
+  categoryOptions: { value: 'utility' | 'content' | 'general'; label: string }[];
 }
 
 export const ADD_MODEL_FORM_LABELS_EN: AddModelFormLabels = {
@@ -79,10 +97,11 @@ export const ADD_MODEL_FORM_LABELS_EN: AddModelFormLabels = {
   fieldModelId: 'Model ID (e.g. gemini-2.5-flash)',
   fieldApiKeySettingKey: 'API-Key Setting',
   fieldDisplayName: 'Display Name (optional)',
+  fieldCategory: 'Category',
   fieldCooldownOverride: 'Cooldown 503 override (sec, optional)',
   btnAdd: 'Add Model',
   btnAdding: 'Adding…',
-  hint: 'The API key setting holds the actual key value — it lives in the API-Keys section below. Multiple models may share the same setting key.',
+  hint: 'The API key setting holds the actual key value — it lives in the API-Keys section below. Multiple models may share the same setting key. Category routes the request: utility for translations/audits, content for lessons/exams, general for both.',
   errorRequired: 'Provider, Model ID and Setting Key are required',
   errorFailed: 'Failed to add model',
   providerOptions: [
@@ -91,7 +110,13 @@ export const ADD_MODEL_FORM_LABELS_EN: AddModelFormLabels = {
     { value: 'anthropic',     label: 'Anthropic (Claude)' },
     { value: 'openrouter',    label: 'OpenRouter' },
     { value: 'deepseek',      label: 'DeepSeek (api.deepseek.com)' },
+    { value: 'ollama',        label: 'Ollama (local)' },
     { value: 'openai_compat', label: 'Custom (self-hosted OpenAI API)' },
+  ],
+  categoryOptions: [
+    { value: 'utility', label: 'Utility — translations, audits, verifier' },
+    { value: 'content', label: 'Content — lessons, exams, chat' },
+    { value: 'general', label: 'General — fallback for both' },
   ],
 };
 
