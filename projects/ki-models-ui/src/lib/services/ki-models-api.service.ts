@@ -5,6 +5,7 @@ import { KI_MODELS_API_BASE } from './ki-models-api.token';
 import { AiModel, AiModelCreate, AiModelUpdate } from '../models/ai-model';
 import { ApiKeySetting, ApiKeySettingUpdate } from '../models/api-key-setting';
 import { CascadeConfig, CascadeConfigUpdate } from '../models/cascade-config';
+import { Cascade } from '../models/cascade';
 
 /**
  * Library-API-Service. Spricht alle KI-Modell-/API-Key-/Cascade-Endpoints
@@ -117,6 +118,28 @@ export class KiModelsApiService {
       `${this.base}/api-keys/setting/${encodeURIComponent(settingKey)}`,
       body,
     );
+  }
+
+  // ─── Cascades (Phase S' — Bereiche mit eigener Failover-Chain + Cooldown) ──
+
+  /**
+   * Liefert alle Cascade-Bereiche der Konsumenten-DB.
+   *
+   * **Vertrag**: Backend exponiert `GET {base}/cascades` → `Cascade[]`.
+   * Frontend (z.B. `<ki-cascades-view>`) rendert eine Karte pro Eintrag.
+   *
+   * Fallback: liefert das Backend `[]` zurueck oder ist Endpoint nicht
+   * verfuegbar, gibt der Wrapper-Component einen leeren Zustand — der
+   * Konsument kann optional die alten 3 Default-Categories als Fallback
+   * rendern.
+   */
+  listCascades(): Observable<Cascade[]> {
+    return this.http.get<Cascade[]>(`${this.base}/cascades`);
+  }
+
+  /** Detail einer einzelnen Cascade. Selten direkt gebraucht; meistens reicht {@link #listCascades}. */
+  getCascade(name: string): Observable<Cascade> {
+    return this.http.get<Cascade>(`${this.base}/cascades/${encodeURIComponent(name)}`);
   }
 
   // ─── Cascade-Config ──────────────────────────────────────────────────────

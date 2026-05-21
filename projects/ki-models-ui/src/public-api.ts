@@ -11,6 +11,7 @@
 export * from './lib/models/ai-model';
 export * from './lib/models/api-key-setting';
 export * from './lib/models/cascade-config';
+export * from './lib/models/cascade';
 export * from './lib/models/labels';
 
 // ─── Service + InjectionToken ────────────────────────────────────────────
@@ -23,3 +24,4 @@ export * from './lib/components/add-model-form.component';
 export * from './lib/components/cascade-cooldown.component';
 export * from './lib/components/api-keys-section.component';
 export * from './lib/components/failover-chain.component';
+export * from './lib/components/cascades-view.component';
