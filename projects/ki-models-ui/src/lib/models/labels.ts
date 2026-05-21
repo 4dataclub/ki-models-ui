@@ -198,6 +198,33 @@ export const API_KEYS_SECTION_LABELS_EN: ApiKeysSectionLabels = {
  * Labels für `<ki-failover-chain>`. Konsument kann alle oder einzelne Strings
  * überschreiben — Defaults sind englisch.
  */
+export interface CascadesViewLabels {
+  /** "Lädt Cascade-Bereiche…" beim ersten Render. */
+  loading: string;
+  /** Hauptzeile wenn Backend leere Liste oder /cascades nicht kennt. */
+  empty: string;
+  /** Sekundärzeile wenn empty — Hinweis was zu tun ist. */
+  emptyHint: string;
+  /** Default-Hint pro Cascade-Karte wenn nicht via [hintByCascade] gesetzt. */
+  defaultHint: string;
+  /** "Cooldown-Status"-Sektion-Header. */
+  cooldownTitle: string;
+  /** Anzeige wenn cooldown=0. */
+  statusFree: string;
+  /** Anzeige wenn cooldown>0 — Präfix vor dem Sekunden-Wert. */
+  statusCooldown: string;
+}
+
+export const CASCADES_VIEW_LABELS_EN: CascadesViewLabels = {
+  loading: 'Loading cascade areas…',
+  empty: 'No cascade areas configured yet.',
+  emptyHint: 'Add at least one model with a category to see it as a cascade card here.',
+  defaultHint: 'Independent failover chain — own cooldown timer + sticky pointer.',
+  cooldownTitle: 'Cooldown status',
+  statusFree: 'free',
+  statusCooldown: 'cooldown',
+};
+
 export interface FailoverChainLabels {
   title: string;
   description: string;
