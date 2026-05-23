@@ -1,5 +1,6 @@
 import { Component, EventEmitter, Input, Output, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { firstValueFrom } from 'rxjs';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { AiModel } from '../models/ai-model';
 import { Cascade } from '../models/cascade';
@@ -71,8 +72,8 @@ import {
 
           <!-- Failover-Chain Editor pro Cascade -->
           <ki-failover-chain
-            [chain]="chainFor(c.name)"
-            [availableModels]="availableModelsFor(c.name)"
+            [chain]="chainsByCascade()[c.name] || []"
+            [availableModels]="availableModelsAll()"
             [availableProviders]="providerOptions"
             [labels]="chainLabels"
             (chainChanged)="onChainChanged(c.name, $event)">
@@ -135,56 +136,29 @@ export class CascadesViewComponent implements OnInit {
   readonly cascades = signal<Cascade[]>([]);
   readonly allModels = signal<AiModel[]>([]);
 
-  ngOnInit(): void {
-    this.reload();
-  }
-
-  reload(): void {
-    this.loading.set(true);
-    // Parallel laden — Cascades-Stats + Modelle (für Filter pro Cascade).
-    Promise.all([
-      this.api.listCascades().toPromise().catch(() => []),
-      this.api.listModels().toPromise().catch(() => []),
-    ]).then(([cs, ms]) => {
-      this.cascades.set(cs || []);
-      this.allModels.set(ms || []);
-      this.loading.set(false);
-    });
-  }
-
   /**
-   * Modelle die zu dieser Cascade gehören.
-   * Konvention: `category=cascadeName` ODER `category=general` (wenn die
-   * Cascade selbst nicht „general" heißt → general wird als Fallback gezeigt).
+   * Pro Cascade-Name die Chain (Array<{provider, model}>) als computed-Signal.
+   * Stabile Referenz solange sich allModels nicht ändert — verhindert CD-Storms
+   * im Failover-Chain-Child und stellt sicher dass die Berechnung erst läuft
+   * wenn allModels wirklich befüllt ist.
    */
-  modelsFor(cascadeName: string): AiModel[] {
-    const name = cascadeName.toLowerCase();
-    return this.allModels()
-      .filter(m => {
+  readonly chainsByCascade = computed<Record<string, ChainEntry[]>>(() => {
+    const result: Record<string, ChainEntry[]> = {};
+    const models = this.allModels();
+    const enabledOnly = models.filter(m => m.enabled && !m.autoDisabled);
+    for (const c of this.cascades()) {
+      const name = c.name.toLowerCase();
+      const subset = enabledOnly.filter(m => {
         const cat = (m.category ?? 'general').toLowerCase();
-        if (cat === name) return true;
-        if (name !== 'general' && cat === 'general') return true;
-        return false;
-      })
-      .filter(m => m.enabled && !m.autoDisabled);
-  }
+        return cat === name || (name !== 'general' && cat === 'general');
+      });
+      result[c.name] = subset.map(m => ({ provider: m.provider, model: m.modelId }));
+    }
+    return result;
+  });
 
-  /** Wandelt die gefilterte Modell-Liste in ChainEntry[] für die Failover-Chain. */
-  chainFor(cascadeName: string): ChainEntry[] {
-    return this.modelsFor(cascadeName).map(m => ({
-      provider: m.provider,
-      model: m.modelId,
-    }));
-  }
-
-  /**
-   * Für `availableModels`-Input der Failover-Chain — strikter Typ ohne
-   * nullable. Wir liefern alle enabled+nicht-disabled-Modelle (nicht nur
-   * cascade-spezifische), damit der Admin im Dropdown auch Modelle aus
-   * anderen Cascades wählen kann (z.B. um ein gemini auch in utility zu
-   * hängen).
-   */
-  availableModelsFor(_cascadeName: string): { provider: string; modelId: string; displayName: string }[] {
+  /** Provider-Modell-Dropdown-Optionen, ebenfalls als computed (stable ref). */
+  readonly availableModelsAll = computed<{ provider: string; modelId: string; displayName: string }[]>(() => {
     return this.allModels()
       .filter(m => m.enabled && !m.autoDisabled)
       .map(m => ({
@@ -192,6 +166,28 @@ export class CascadesViewComponent implements OnInit {
         modelId: m.modelId,
         displayName: m.displayName ?? m.modelId,
       }));
+  });
+
+  ngOnInit(): void {
+    this.reload();
+  }
+
+  reload(): void {
+    this.loading.set(true);
+    // Parallel laden — Cascades-Stats + Modelle (für Filter pro Cascade).
+    // `firstValueFrom` statt `.toPromise()` (deprecated, kann undefined liefern
+    // wenn die Observable ohne Wert completes — was bei HttpClient bei leerer
+    // Response geschehen kann und allModels=[] hinterlässt, womit chainFor()
+    // jeder Cascade auch leer wäre und die Failover-Chain die EmptyState
+    // zeigt obwohl die Cascade-Karten selbst da sind).
+    Promise.all([
+      firstValueFrom(this.api.listCascades()).catch(() => [] as any),
+      firstValueFrom(this.api.listModels()).catch(() => [] as any),
+    ]).then(([cs, ms]) => {
+      this.cascades.set(Array.isArray(cs) ? cs : []);
+      this.allModels.set(Array.isArray(ms) ? ms : []);
+      this.loading.set(false);
+    });
   }
 
   hintFor(cascadeName: string): string {
