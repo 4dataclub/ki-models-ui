@@ -89,7 +89,14 @@ export interface AddModelFormLabels {
   errorRequired: string;
   errorFailed: string;
   providerOptions: { value: string; label: string }[];
-  categoryOptions: { value: 'utility' | 'content' | 'general'; label: string }[];
+  /**
+   * Optionen im Kategorie-Dropdown der Add-Model-Form. Seit v0.10.0 generisch
+   * (`value: string`), damit Konsumenten ihre eigenen Kategorien anbieten
+   * können (z.B. Switcher: `cloud`/`free-only`, EduPro: `utility`/`content`/
+   * `general`). Werte müssen dem Format `[a-z0-9_-]{1,50}` entsprechen
+   * (siehe llm-cascade `ApiController.normalizeCategory`).
+   */
+  categoryOptions: { value: string; label: string }[];
 }
 
 export const ADD_MODEL_FORM_LABELS_EN: AddModelFormLabels = {

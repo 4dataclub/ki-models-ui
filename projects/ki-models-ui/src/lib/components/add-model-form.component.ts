@@ -2,7 +2,7 @@ import { Component, EventEmitter, Input, Output, inject, signal } from '@angular
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { KiModelsApiService } from '../services/ki-models-api.service';
-import { AiModel, AiModelCategory, AiModelCreate } from '../models/ai-model';
+import { AiModel, AiModelCreate } from '../models/ai-model';
 import { ApiKeySetting } from '../models/api-key-setting';
 import { AddModelFormLabels, ADD_MODEL_FORM_LABELS_EN } from '../models/labels';
 
@@ -139,8 +139,14 @@ export class AddModelFormComponent {
   modelId = '';
   apiKeySettingKey = 'geminiApiKey';
   displayName = '';
-  /** Default content — neue Gemini-Modelle sind typischerweise Content. */
-  category: AiModelCategory = 'content';
+  /**
+   * Aktuell gewählte Kategorie. Default `'content'` (Backward-Compat zu
+   * EduPro-Setup). Konsumenten mit anderen Kategorie-Schemata setzen den
+   * Default über `[defaultCategoryByProvider]` (siehe unten) oder ändern
+   * `categoryOptions` in den Labels — die erste Option wird dann beim
+   * Provider-Wechsel selektiert wenn kein Match passt.
+   */
+  category: string = 'content';
   cooldown503OverrideSec: number | null = null;
 
   readonly submitting = signal(false);
@@ -165,7 +171,13 @@ export class AddModelFormComponent {
    *   openrouter   → general (Mischbestand, oft Fallback)
    *   andere       → general
    */
-  private readonly defaultCategory: Record<string, AiModelCategory> = {
+  /**
+   * Default-Kategorie pro Provider (Backward-Compat zum EduPro-Schema
+   * `utility`/`content`/`general`). Konsumenten mit eigenem Schema
+   * (z.B. Switcher mit `cloud`/`free-only`) überschreiben das via
+   * `[defaultCategoryByProvider]`.
+   */
+  @Input() defaultCategoryByProvider: Record<string, string> = {
     gemini:        'content',
     openai:        'content',
     anthropic:     'content',
@@ -227,7 +239,7 @@ export class AddModelFormComponent {
   onProviderChange(): void {
     const def = this.defaultSettingKey[this.provider];
     if (def) this.apiKeySettingKey = def;
-    const cat = this.defaultCategory[this.provider];
+    const cat = this.defaultCategoryByProvider[this.provider];
     if (cat) this.category = cat;
   }
 
