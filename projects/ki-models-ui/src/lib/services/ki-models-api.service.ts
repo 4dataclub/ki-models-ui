@@ -6,6 +6,7 @@ import { AiModel, AiModelCreate, AiModelUpdate } from '../models/ai-model';
 import { ApiKeySetting, ApiKeySettingUpdate } from '../models/api-key-setting';
 import { CascadeConfig, CascadeConfigUpdate } from '../models/cascade-config';
 import { Cascade } from '../models/cascade';
+import { Category, CategoryUpdate } from '../models/category';
 
 /**
  * Library-API-Service. Spricht alle KI-Modell-/API-Key-/Cascade-Endpoints
@@ -140,6 +141,43 @@ export class KiModelsApiService {
   /** Detail einer einzelnen Cascade. Selten direkt gebraucht; meistens reicht {@link #listCascades}. */
   getCascade(name: string): Observable<Cascade> {
     return this.http.get<Cascade>(`${this.base}/cascades/${encodeURIComponent(name)}`);
+  }
+
+  // ─── Categories (Display-Metadaten pro Kategorie — v0.10.0) ─────────────
+
+  /**
+   * Liste aller Kategorien (Display-Metadaten). Backend vereint implizite
+   * Kategorien aus `ai_model_config.category` mit persistierten
+   * `category_meta`-Einträgen — Felder ohne gesetzte Metadaten kommen mit
+   * `null` zurück. Wenn der Endpoint nicht existiert (Backward-Compat zu
+   * llm-cascade < 0.5), liefert der Konsument `404`; das Frontend muss
+   * dann selbst auf leeren Default zurückfallen.
+   */
+  listCategories(): Observable<Category[]> {
+    return this.http.get<Category[]>(`${this.base}/categories`);
+  }
+
+  /**
+   * Upsert für die Display-Metadaten einer Kategorie. Wird vom Inline-Edit
+   * der Cascades-View aufgerufen. Partial-Update: Felder die nicht im Body
+   * stehen werden NICHT angefasst; `null` löscht das Feld explizit.
+   */
+  updateCategory(name: string, body: CategoryUpdate): Observable<{ ok: boolean }> {
+    return this.http.put<{ ok: boolean }>(
+      `${this.base}/categories/${encodeURIComponent(name)}`,
+      body,
+    );
+  }
+
+  /**
+   * Löscht NUR die Metadaten-Zeile — die Kategorie selbst lebt weiter,
+   * solange ein Modell sie nutzt. Nach Delete bekommt sie wieder die
+   * UI-Fallbacks (capitalized name, leerer Hint).
+   */
+  deleteCategoryMeta(name: string): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(
+      `${this.base}/categories/${encodeURIComponent(name)}`,
+    );
   }
 
   // ─── Cascade-Config ──────────────────────────────────────────────────────
