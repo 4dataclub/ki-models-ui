@@ -58,12 +58,22 @@ import { AddModelFormLabels, ADD_MODEL_FORM_LABELS_EN } from '../models/labels';
           </option>
         </select>
 
-        <select [(ngModel)]="category"
-                name="category"
-                class="ki-input"
-                [attr.aria-label]="L.fieldCategory">
+        <!-- v0.10.2: <input list> statt <select> — bestehende Kategorien werden
+             als Vorschläge angezeigt, der User kann aber auch eine NEUE Kategorie
+             frei tippen (z.B. "local", "ollama") und damit eine neue Cascade
+             implizit anlegen. Backend (llm-cascade ≥ 0.5.0) akzeptiert jeden
+             Identifier nach [a-z0-9_-]{1,50} und fällt sonst auf "general" zurück.
+             -->
+        <input [(ngModel)]="category"
+               name="category"
+               list="ki-category-suggestions"
+               [placeholder]="L.fieldCategory"
+               [attr.aria-label]="L.fieldCategory"
+               class="ki-input ki-mono"
+               (change)="onCategoryInput()" />
+        <datalist id="ki-category-suggestions">
           <option *ngFor="let c of categoryDropdownOptions()" [value]="c.value">{{ c.label }}</option>
-        </select>
+        </datalist>
 
         <input [(ngModel)]="displayName"
                name="displayName"
@@ -272,6 +282,20 @@ export class AddModelFormComponent {
 
   modelIdSuggestions(): string[] {
     return this.modelIdSuggestionsByProvider[this.provider] ?? [];
+  }
+
+  /**
+   * Normalisiert die Kategorie-Eingabe live während des Tippens
+   * — lowercase, Trim, Whitespace → `-`. Erlaubte Zeichen sind
+   * `[a-z0-9_-]{1,50}`; alles andere wird stillschweigend entfernt
+   * (Backend würde sonst auf `general` zurückfallen). v0.10.2 — Folge
+   * der Umstellung von `<select>` auf `<input list>` damit neue
+   * Kategorien per Freitext angelegt werden können.
+   */
+  onCategoryInput(): void {
+    const raw = (this.category ?? '').toString().trim().toLowerCase();
+    const cleaned = raw.replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '').slice(0, 50);
+    if (cleaned !== this.category) this.category = cleaned;
   }
 
   /**
