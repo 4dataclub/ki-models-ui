@@ -126,6 +126,62 @@ export class AdminComponent {
 
 ---
 
+## Kategorien — generisch seit v0.10.0
+
+Jedes Modell hat eine `category` (Routing-Stempel). Die Library schreibt
+**keine** Kategorien vor — Konsumenten entscheiden selbst, welche Kategorien
+ihre Cascade hat. Beispiele:
+
+| Konsument | Kategorien                          | Bedeutung                                          |
+|-----------|-------------------------------------|----------------------------------------------------|
+| EduPro    | `utility` / `content` / `general`   | Task-Typ (Audits vs. Lehr-Content vs. Fallback)    |
+| Switcher  | `cloud` / `free-only`               | Kosten-Tier (Premium vs. Rate-Limited-Free)        |
+| (Beispiel)| `local` / `cloud` / `general`       | Wenn Ollama-Modelle lokal danebenlaufen sollen     |
+
+**Wie funktioniert das visuell?**
+
+```
+┌──────────────────────────────────────────────────────┐
+│   Models-Tabelle gruppiert nach Kategorie            │
+│                                                      │
+│   ┌─ CLOUD ──────────────────────────────────────┐   │
+│   │  Premium-Modelle, eigener Cooldown           │   │
+│   │  • anthropic:claude-opus-4-7      [ON]       │   │
+│   │  • gemini:gemini-2.5-pro          [ON]       │   │
+│   └──────────────────────────────────────────────┘   │
+│                                                      │
+│   ┌─ FREE ONLY ──────────────────────────────────┐   │
+│   │  Kostenfreie OpenRouter-Modelle              │   │
+│   │  • openrouter:deepseek-v3:free    [ON]       │   │
+│   │  • openrouter:llama-3.3:free      [ON]       │   │
+│   └──────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────┘
+```
+
+**Was muss der Konsument tun?** Drei Inputs an `<ki-models-table>`:
+
+```html
+<ki-models-table
+  [categoryTitles]="{ cloud: 'Cloud — Premium', 'free-only': 'Free Tier' }"
+  [categoryHints]="{
+    cloud: 'Bezahlte Tier-Modelle, eigener Cooldown.',
+    'free-only': 'Kostenfrei via OpenRouter, kein Cooldown.'
+  }"
+  [categoryOrder]="['cloud', 'free-only']"
+></ki-models-table>
+```
+
+Wenn der Konsument **nichts** angibt: Backward-Compat — `utility`/`content`/
+`general` bekommen die englischen Defaults aus den Labels, alles andere wird
+capitalized (`free-only` → `Free Only`). Sortiert wird dann nach erstem
+Auftreten in der Modell-Liste (= globaler `orderIdx`).
+
+**Validierung am Backend:** `llm-cascade` akzeptiert jeden String nach
+`[a-z0-9_-]{1,50}` — alles andere fällt auf `general` zurück. Siehe
+[`ApiController.normalizeCategory`](https://github.com/4dataclub/llm-cascade/blob/main/src/main/java/com/dataclub/llmcascade/controller/ApiController.java).
+
+---
+
 ## Backend-Vertrag
 
 Konsumenten-Backend muss folgende Endpoints unter der konfigurierten Base

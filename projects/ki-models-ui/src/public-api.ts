@@ -12,6 +12,7 @@ export * from './lib/models/ai-model';
 export * from './lib/models/api-key-setting';
 export * from './lib/models/cascade-config';
 export * from './lib/models/cascade';
+export * from './lib/models/category';
 export * from './lib/models/labels';
 
 // ─── Service + InjectionToken ────────────────────────────────────────────

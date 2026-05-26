@@ -1,7 +1,7 @@
 import { Component, EventEmitter, Input, Output, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { KiModelsApiService } from '../services/ki-models-api.service';
-import { AiModel, AiModelCategory, AI_MODEL_CATEGORIES } from '../models/ai-model';
+import { AiModel } from '../models/ai-model';
 import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
 
 /**
@@ -249,39 +249,108 @@ export class ModelsTableComponent {
    */
   @Input() activeModelId: string | null = null;
 
+  /**
+   * Anzeige-Titel pro Kategorie. Generisch seit v0.10.0 — Konsumenten reichen
+   * eine Map aller Kategorien rein, die ihre Modelle nutzen. Fehlende
+   * Einträge fallen auf `categoryUtility`/`categoryContent`/`categoryGeneral`
+   * aus den Labels zurück (Backward-Compat zu v0.9.x), und für alles andere
+   * auf den capitalized Kategorie-String selbst.
+   *
+   * Beispiele:
+   *  - EduPro übergibt nichts → Defaults aus `MODELS_TABLE_LABELS_*` greifen.
+   *  - Switcher übergibt `{ cloud: 'Cloud — Premium', 'free-only': 'Free Tier' }`.
+   */
+  @Input() categoryTitles: Record<string, string> = {};
+
+  /** Sub-Beschreibung pro Kategorie. Selbe Fallback-Kette wie `categoryTitles`. */
+  @Input() categoryHints: Record<string, string> = {};
+
+  /**
+   * Explizite Reihenfolge der Kategorie-Sektionen. Wenn leer (Default),
+   * werden Kategorien in der Reihenfolge gezeigt, in der sie erstmals in
+   * `models()` auftauchen — was wiederum der globalen `orderIdx`-Reihenfolge
+   * folgt. Für deterministische UI: Konsument liefert seine Wunsch-Reihenfolge.
+   */
+  @Input() categoryOrder: string[] = [];
+
   private readonly api = inject(KiModelsApiService);
 
   readonly loading = signal(true);
   readonly models = signal<AiModel[]>([]);
   readonly testResult = signal<Record<number, { ok?: boolean; latencyMs?: number; error?: string; pending?: boolean; skipped?: boolean }>>({});
 
-  /** Modelle gruppiert nach Kategorie. null/undefined → 'general'. */
-  readonly modelsByCategory = computed<Record<AiModelCategory, AiModel[]>>(() => {
-    const buckets: Record<AiModelCategory, AiModel[]> = { utility: [], content: [], general: [] };
+  /**
+   * Modelle gruppiert nach Kategorie. null/undefined/leer → `'general'`
+   * (bleibt Default — passt zum llm-cascade-Backend, das ebenfalls auf
+   * `general` fällt). Beliebige String-Kategorien werden akzeptiert.
+   */
+  readonly modelsByCategory = computed<Record<string, AiModel[]>>(() => {
+    const buckets: Record<string, AiModel[]> = {};
     for (const m of this.models()) {
-      const cat: AiModelCategory = (m.category && (AI_MODEL_CATEGORIES as string[]).includes(m.category))
-        ? m.category : 'general';
-      buckets[cat].push(m);
+      const cat = m.category && m.category.trim() ? m.category : 'general';
+      (buckets[cat] ??= []).push(m);
     }
     return buckets;
   });
 
-  /** Kategorien die mindestens 1 Modell enthalten — leere Sections werden ausgeblendet. */
-  readonly categoriesWithModels = computed<AiModelCategory[]>(() => {
+  /**
+   * Kategorien die mindestens 1 Modell enthalten. Reihenfolge:
+   *   1. Explizit via `[categoryOrder]` — diese kommen zuerst (in der
+   *      gegebenen Reihenfolge, sofern sie überhaupt Modelle enthalten).
+   *   2. Alle restlichen Kategorien danach in der Reihenfolge ihres
+   *      ersten Auftretens in `models()` (= globaler `orderIdx`).
+   */
+  readonly categoriesWithModels = computed<string[]>(() => {
     const by = this.modelsByCategory();
-    return AI_MODEL_CATEGORIES.filter(c => by[c].length > 0);
+    const present = Object.keys(by);
+    const seen = new Set<string>();
+    const ordered: string[] = [];
+    for (const c of this.categoryOrder) {
+      if (by[c]?.length && !seen.has(c)) { ordered.push(c); seen.add(c); }
+    }
+    for (const m of this.models()) {
+      const c = m.category && m.category.trim() ? m.category : 'general';
+      if (by[c]?.length && !seen.has(c)) { ordered.push(c); seen.add(c); }
+    }
+    for (const c of present) {
+      if (!seen.has(c)) { ordered.push(c); seen.add(c); }
+    }
+    return ordered;
   });
 
-  categoryTitle(c: AiModelCategory): string {
-    return c === 'utility' ? this.L.categoryUtility
-      : c === 'content'    ? this.L.categoryContent
-                            : this.L.categoryGeneral;
+  /**
+   * Capitalize + Bindestrich/Underscore zu Leerzeichen — als letztes Fallback
+   * für unbekannte Kategorien (z.B. `free-only` → `Free Only`, `cloud` → `Cloud`).
+   * Damit sieht die UI auch ohne explizite `categoryTitles`-Map nicht roh aus.
+   */
+  private prettifyCategory(c: string): string {
+    return c.replace(/[-_]+/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
   }
 
-  categoryHint(c: AiModelCategory): string {
-    return c === 'utility' ? this.L.categoryUtilityHint
-      : c === 'content'    ? this.L.categoryContentHint
-                            : this.L.categoryGeneralHint;
+  /**
+   * Title-Lookup-Reihenfolge:
+   *   1. Explizit via `[categoryTitles]`-Map (Konsumenten-Override)
+   *   2. Backward-Compat zu v0.9.x: hardcoded utility/content/general aus Labels
+   *   3. Capitalized Kategorie-String als Fallback
+   */
+  categoryTitle(c: string): string {
+    if (this.categoryTitles[c]) return this.categoryTitles[c];
+    if (c === 'utility') return this.L.categoryUtility;
+    if (c === 'content') return this.L.categoryContent;
+    if (c === 'general') return this.L.categoryGeneral;
+    return this.prettifyCategory(c);
+  }
+
+  /**
+   * Hint-Lookup-Reihenfolge analog `categoryTitle`. Wenn kein Hint gefunden:
+   * leerer String (UI zeigt dann nur den Title).
+   */
+  categoryHint(c: string): string {
+    if (this.categoryHints[c]) return this.categoryHints[c];
+    if (c === 'utility') return this.L.categoryUtilityHint;
+    if (c === 'content') return this.L.categoryContentHint;
+    if (c === 'general') return this.L.categoryGeneralHint;
+    return '';
   }
 
   ngOnInit(): void {
@@ -340,7 +409,7 @@ export class ModelsTableComponent {
    * sind am Ende der Kategorie disabled). Globale Reihenfolge bleibt stabil,
    * nur die zwei Positionen werden gewechselt.
    */
-  moveInCategory(cat: AiModelCategory, idxInCat: number, dir: -1 | 1): void {
+  moveInCategory(cat: string, idxInCat: number, dir: -1 | 1): void {
     const subset = this.modelsByCategory()[cat];
     const target = idxInCat + dir;
     if (target < 0 || target >= subset.length) return;

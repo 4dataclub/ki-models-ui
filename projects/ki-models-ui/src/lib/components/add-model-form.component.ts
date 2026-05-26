@@ -2,8 +2,9 @@ import { Component, EventEmitter, Input, Output, inject, signal } from '@angular
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { KiModelsApiService } from '../services/ki-models-api.service';
-import { AiModel, AiModelCategory, AiModelCreate } from '../models/ai-model';
+import { AiModel, AiModelCreate } from '../models/ai-model';
 import { ApiKeySetting } from '../models/api-key-setting';
+import { Category } from '../models/category';
 import { AddModelFormLabels, ADD_MODEL_FORM_LABELS_EN } from '../models/labels';
 
 /**
@@ -61,7 +62,7 @@ import { AddModelFormLabels, ADD_MODEL_FORM_LABELS_EN } from '../models/labels';
                 name="category"
                 class="ki-input"
                 [attr.aria-label]="L.fieldCategory">
-          <option *ngFor="let c of L.categoryOptions" [value]="c.value">{{ c.label }}</option>
+          <option *ngFor="let c of categoryDropdownOptions()" [value]="c.value">{{ c.label }}</option>
         </select>
 
         <input [(ngModel)]="displayName"
@@ -139,13 +140,27 @@ export class AddModelFormComponent {
   modelId = '';
   apiKeySettingKey = 'geminiApiKey';
   displayName = '';
-  /** Default content — neue Gemini-Modelle sind typischerweise Content. */
-  category: AiModelCategory = 'content';
+  /**
+   * Aktuell gewählte Kategorie. Default `'content'` (Backward-Compat zu
+   * EduPro-Setup). Konsumenten mit anderen Kategorie-Schemata setzen den
+   * Default über `[defaultCategoryByProvider]` (siehe unten) oder ändern
+   * `categoryOptions` in den Labels — die erste Option wird dann beim
+   * Provider-Wechsel selektiert wenn kein Match passt.
+   */
+  category: string = 'content';
   cooldown503OverrideSec: number | null = null;
 
   readonly submitting = signal(false);
   readonly error = signal<string | null>(null);
   readonly keys = signal<ApiKeySetting[]>([]);
+
+  /**
+   * Kategorien aus dem Backend (v0.10.0 — `GET {base}/categories`). Wird im
+   * `ngOnInit` befüllt; bei 404 (Backend ohne CategoryMeta-Endpoint) bleibt
+   * das leer und das Dropdown fällt auf `L.categoryOptions` zurück
+   * (Konsumenten-Labels — Backward-Compat zu EduPros utility/content/general).
+   */
+  readonly categoriesFromBackend = signal<Category[]>([]);
 
   private readonly defaultSettingKey: Record<string, string> = {
     gemini:        'geminiApiKey',
@@ -165,7 +180,13 @@ export class AddModelFormComponent {
    *   openrouter   → general (Mischbestand, oft Fallback)
    *   andere       → general
    */
-  private readonly defaultCategory: Record<string, AiModelCategory> = {
+  /**
+   * Default-Kategorie pro Provider (Backward-Compat zum EduPro-Schema
+   * `utility`/`content`/`general`). Konsumenten mit eigenem Schema
+   * (z.B. Switcher mit `cloud`/`free-only`) überschreiben das via
+   * `[defaultCategoryByProvider]`.
+   */
+  @Input() defaultCategoryByProvider: Record<string, string> = {
     gemini:        'content',
     openai:        'content',
     anthropic:     'content',
@@ -222,17 +243,61 @@ export class AddModelFormComponent {
       next: (list) => this.keys.set(list),
       error: () => this.keys.set([]),
     });
+    this.api.listCategories().subscribe({
+      next: (list) => {
+        this.categoriesFromBackend.set(Array.isArray(list) ? list : []);
+        // Wenn das aktuell selektierte `category` nicht im Backend-Set steckt
+        // (z.B. EduPro mit utility/content/general gegen Switcher-Schema cloud/
+        // free-only), nimm die erste Backend-Kategorie als Default — sonst
+        // submitted die Form einen ungültigen Wert.
+        const opts = this.categoryDropdownOptions();
+        if (opts.length && !opts.some(o => o.value === this.category)) {
+          this.category = opts[0].value;
+        }
+      },
+      error: () => this.categoriesFromBackend.set([]),
+    });
   }
 
   onProviderChange(): void {
     const def = this.defaultSettingKey[this.provider];
     if (def) this.apiKeySettingKey = def;
-    const cat = this.defaultCategory[this.provider];
-    if (cat) this.category = cat;
+    const cat = this.defaultCategoryByProvider[this.provider];
+    // Default-Category nur setzen wenn sie auch im Dropdown ist (sonst hätte
+    // der User eine selektierte Kategorie die das Dropdown nicht anzeigt).
+    if (cat && this.categoryDropdownOptions().some(o => o.value === cat)) {
+      this.category = cat;
+    }
   }
 
   modelIdSuggestions(): string[] {
     return this.modelIdSuggestionsByProvider[this.provider] ?? [];
+  }
+
+  /**
+   * Optionen für das Kategorie-Dropdown. Reihenfolge:
+   *   1. Backend-Kategorien (`/api/categories`) — wenn vorhanden, nutzt
+   *      `displayName` falls gesetzt sonst Capitalized `name`.
+   *   2. `L.categoryOptions` aus den Labels (Konsumenten-Default) — Fallback
+   *      für Backend-Versionen ohne CategoryMeta-Endpoint.
+   *
+   * So bekommt jeder Konsument automatisch SEINE Kategorien (Switcher:
+   * cloud/free-only/…, EduPro: utility/content/general) ohne dass die
+   * Library oder der Konsument das hardcodieren muss.
+   */
+  categoryDropdownOptions(): { value: string; label: string }[] {
+    const backend = this.categoriesFromBackend();
+    if (backend.length > 0) {
+      return backend.map(c => ({
+        value: c.name,
+        label: c.displayName?.trim() || this.prettifyCategory(c.name),
+      }));
+    }
+    return this.L.categoryOptions;
+  }
+
+  private prettifyCategory(c: string): string {
+    return c.replace(/[-_]+/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
   }
 
   /** Existierende Settings als Optionen + Default-Settings die noch nicht in DB sind. */

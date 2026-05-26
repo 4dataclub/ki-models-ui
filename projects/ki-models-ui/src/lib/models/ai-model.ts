@@ -1,8 +1,29 @@
-/** Routing-Kategorien für zweistufiges Cascade-Routing (Phase R). */
-export type AiModelCategory = 'utility' | 'content' | 'general';
+/**
+ * Routing-Kategorie für die Cascade. Frei wählbarer Identifier
+ * (`[a-z0-9_-]{1,50}` — siehe llm-cascade `ApiController.normalizeCategory`).
+ * Die gültigen Kategorien leben in der DB des Konsumenten, nicht im Code:
+ *   - EduPro nutzt z.B. `utility` / `content` / `general` (Task-Typ).
+ *   - Switcher nutzt z.B. `cloud` / `free-only` (Kosten-Tier).
+ *   - Konsumenten mit lokalen Modellen ergänzen z.B. `local` / `ollama`.
+ *
+ * Bis v0.9.x war der Typ auf `'utility' | 'content' | 'general'` beschränkt;
+ * seit v0.10.0 generisch. Konsumenten geben die UI-Labels über die Inputs
+ * `[categoryTitles]` / `[categoryHints]` / `[categoryOrder]` an die
+ * Models-Table-Komponente weiter.
+ */
+export type AiModelCategory = string;
 
-/** Alle UI-relevanten Kategorien in Anzeige-Reihenfolge (Tabelle gruppiert oben → unten). */
-export const AI_MODEL_CATEGORIES: AiModelCategory[] = ['utility', 'content', 'general'];
+/**
+ * Well-known Kategorien-IDs als Convenience-Konstanten — KEIN Enum.
+ * Konsumenten dürfen jeden String nutzen, der dem Identifier-Format genügt.
+ * Diese Liste wird intern nur noch als Default-Order verwendet, falls der
+ * Konsument keinen `[categoryOrder]`-Input liefert UND Modelle exakt diese
+ * Kategorien haben (rückwärtskompatibel zu v0.9.x EduPro-Setup).
+ */
+export const AI_MODEL_CATEGORIES_DEFAULT_ORDER: readonly string[] = ['utility', 'content', 'general'];
+
+/** @deprecated Seit v0.10.0 — siehe {@link AI_MODEL_CATEGORIES_DEFAULT_ORDER}. */
+export const AI_MODEL_CATEGORIES = AI_MODEL_CATEGORIES_DEFAULT_ORDER;
 
 /**
  * Ein KI-Modell in der Cascade. Felder spiegeln die llm-cascade API +

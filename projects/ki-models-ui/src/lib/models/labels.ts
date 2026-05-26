@@ -89,7 +89,14 @@ export interface AddModelFormLabels {
   errorRequired: string;
   errorFailed: string;
   providerOptions: { value: string; label: string }[];
-  categoryOptions: { value: 'utility' | 'content' | 'general'; label: string }[];
+  /**
+   * Optionen im Kategorie-Dropdown der Add-Model-Form. Seit v0.10.0 generisch
+   * (`value: string`), damit Konsumenten ihre eigenen Kategorien anbieten
+   * können (z.B. Switcher: `cloud`/`free-only`, EduPro: `utility`/`content`/
+   * `general`). Werte müssen dem Format `[a-z0-9_-]{1,50}` entsprechen
+   * (siehe llm-cascade `ApiController.normalizeCategory`).
+   */
+  categoryOptions: { value: string; label: string }[];
 }
 
 export const ADD_MODEL_FORM_LABELS_EN: AddModelFormLabels = {
@@ -213,6 +220,14 @@ export interface CascadesViewLabels {
   statusFree: string;
   /** Anzeige wenn cooldown>0 — Präfix vor dem Sekunden-Wert. */
   statusCooldown: string;
+  /** Tooltip/Hint für die klickbare Description (v0.10.0 Inline-Edit). */
+  editHintTooltip: string;
+  /** Placeholder im Textfeld wenn description leer ist (v0.10.0). */
+  editHintPlaceholder: string;
+  /** Speichern-Button-Label im Edit-Mode (v0.10.0). */
+  editHintSave: string;
+  /** Abbrechen-Button-Label im Edit-Mode (v0.10.0). */
+  editHintCancel: string;
 }
 
 export const CASCADES_VIEW_LABELS_EN: CascadesViewLabels = {
@@ -223,6 +238,10 @@ export const CASCADES_VIEW_LABELS_EN: CascadesViewLabels = {
   cooldownTitle: 'Cooldown status',
   statusFree: 'free',
   statusCooldown: 'cooldown',
+  editHintTooltip: 'Click to edit description',
+  editHintPlaceholder: 'Describe what this cascade is for (e.g. "Premium tier — paid models, own cooldown")…',
+  editHintSave: 'Save',
+  editHintCancel: 'Cancel',
 };
 
 export interface FailoverChainLabels {

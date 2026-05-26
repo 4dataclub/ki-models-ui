@@ -1,9 +1,11 @@
 import { Component, EventEmitter, Input, Output, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { AiModel } from '../models/ai-model';
 import { Cascade } from '../models/cascade';
+import { Category } from '../models/category';
 import { ChainEntry } from '../models/cascade-config';
 import { FailoverChainComponent } from './failover-chain.component';
 import {
@@ -34,7 +36,7 @@ import {
 @Component({
   selector: 'ki-cascades-view',
   standalone: true,
-  imports: [CommonModule, FailoverChainComponent],
+  imports: [CommonModule, FormsModule, FailoverChainComponent],
   template: `
     <div class="space-y-6">
       <!-- Loading -->
@@ -58,11 +60,42 @@ import {
           <header class="mb-4 flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
               <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wide">
-                {{ c.name }}
+                {{ titleFor(c.name) }}
               </h3>
-              <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                {{ hintFor(c.name) }}
-              </p>
+
+              <!-- Inline-Edit für description (v0.10.0). Click auf den Text →
+                   Textarea. Enter speichert, Escape bricht ab, Blur speichert.
+                   Während Edit ist hint via 'editing()'-Signal blockiert. -->
+              <ng-container *ngIf="editing() !== c.name">
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 cursor-pointer hover:text-slate-700 dark:hover:text-slate-200 transition"
+                   [title]="L.editHintTooltip"
+                   (click)="startEdit(c.name)">
+                  {{ hintFor(c.name) }}
+                </p>
+              </ng-container>
+              <ng-container *ngIf="editing() === c.name">
+                <textarea
+                  class="mt-1 w-full text-xs px-2 py-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  rows="2"
+                  [(ngModel)]="editText"
+                  [placeholder]="L.editHintPlaceholder"
+                  (keydown.enter)="$event.preventDefault(); saveEdit(c.name)"
+                  (keydown.escape)="cancelEdit()"
+                  #editArea
+                  autofocus></textarea>
+                <div class="mt-1 flex gap-2 text-[10px]">
+                  <button (click)="saveEdit(c.name)"
+                          [disabled]="saving()"
+                          class="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold uppercase tracking-wide">
+                    {{ L.editHintSave }}
+                  </button>
+                  <button (click)="cancelEdit()"
+                          [disabled]="saving()"
+                          class="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 text-slate-700 dark:text-slate-200 font-bold uppercase tracking-wide">
+                    {{ L.editHintCancel }}
+                  </button>
+                </div>
+              </ng-container>
             </div>
             <span *ngIf="c.currentModel"
                   class="shrink-0 text-[10px] font-mono px-2 py-1 rounded-md bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
@@ -137,6 +170,23 @@ export class CascadesViewComponent implements OnInit {
   readonly allModels = signal<AiModel[]>([]);
 
   /**
+   * Display-Metadaten pro Kategorie (v0.10.0). Wird beim init aus
+   * `GET {base}/categories` geladen. Wenn der Endpoint nicht existiert
+   * (Backward-Compat zu llm-cascade < 0.5), bleibt das Array leer und das
+   * UI fällt auf den `[hintByCascade]`-Input bzw. `L.defaultHint` zurück.
+   */
+  readonly categoriesMeta = signal<Category[]>([]);
+
+  /**
+   * Inline-Edit-State: Name der Kategorie die gerade editiert wird (oder
+   * `null` wenn kein Edit aktiv). `editText` ist der aktuelle Textarea-Wert.
+   * `saving` blockiert die Buttons während des PUT-Roundtrips.
+   */
+  readonly editing = signal<string | null>(null);
+  editText = '';
+  readonly saving = signal(false);
+
+  /**
    * Pro Cascade-Name die Chain (Array<{provider, model}>) als computed-Signal.
    * Stabile Referenz solange sich allModels nicht ändert — verhindert CD-Storms
    * im Failover-Chain-Child und stellt sicher dass die Berechnung erst läuft
@@ -174,24 +224,98 @@ export class CascadesViewComponent implements OnInit {
 
   reload(): void {
     this.loading.set(true);
-    // Parallel laden — Cascades-Stats + Modelle (für Filter pro Cascade).
-    // `firstValueFrom` statt `.toPromise()` (deprecated, kann undefined liefern
-    // wenn die Observable ohne Wert completes — was bei HttpClient bei leerer
-    // Response geschehen kann und allModels=[] hinterlässt, womit chainFor()
-    // jeder Cascade auch leer wäre und die Failover-Chain die EmptyState
-    // zeigt obwohl die Cascade-Karten selbst da sind).
+    // Parallel laden — Cascades-Stats + Modelle (für Filter pro Cascade) +
+    // Categories-Display-Metadaten (v0.10.0). `firstValueFrom` statt
+    // `.toPromise()`. Categories ist optional (404 → leer fallback).
     Promise.all([
       firstValueFrom(this.api.listCascades()).catch(() => [] as any),
       firstValueFrom(this.api.listModels()).catch(() => [] as any),
-    ]).then(([cs, ms]) => {
+      firstValueFrom(this.api.listCategories()).catch(() => [] as any),
+    ]).then(([cs, ms, cats]) => {
       this.cascades.set(Array.isArray(cs) ? cs : []);
       this.allModels.set(Array.isArray(ms) ? ms : []);
+      this.categoriesMeta.set(Array.isArray(cats) ? cats : []);
       this.loading.set(false);
     });
   }
 
+  /**
+   * Title-Lookup-Reihenfolge:
+   *   1. `displayName` aus den Categories-Metadaten (User hat's gesetzt)
+   *   2. Roher Cascade-Name (rückwärtskompatibel, bisheriges Verhalten)
+   *
+   * Der Cascade-Name selbst kommt vom Backend `/cascades` und ist bereits
+   * der Kategorie-Identifier — wir capitalisieren ihn NICHT zusätzlich, weil
+   * die alten UIs ihn bereits via `uppercase`-CSS rendern.
+   */
+  titleFor(cascadeName: string): string {
+    const meta = this.categoriesMeta().find(c => c.name === cascadeName.toLowerCase());
+    return meta?.displayName?.trim() || cascadeName;
+  }
+
+  /**
+   * Hint-Lookup-Reihenfolge:
+   *   1. `description` aus den Categories-Metadaten (User-edit per Inline-Edit)
+   *   2. `[hintByCascade]`-Input vom Konsumenten (sein hardcoded Default)
+   *   3. `L.defaultHint` (Library-Englisch-Fallback)
+   */
   hintFor(cascadeName: string): string {
-    return this.hintByCascade[cascadeName.toLowerCase()] ?? this.L.defaultHint;
+    const key = cascadeName.toLowerCase();
+    const meta = this.categoriesMeta().find(c => c.name === key);
+    return meta?.description?.trim()
+      || this.hintByCascade[key]
+      || this.L.defaultHint;
+  }
+
+  /** Klick auf den Hint → Edit-Mode aktivieren mit aktuellem Wert vorbefüllt. */
+  startEdit(cascadeName: string): void {
+    const key = cascadeName.toLowerCase();
+    const meta = this.categoriesMeta().find(c => c.name === key);
+    // Vorgeladener Text: NUR die persistierte description, NICHT der Konsumenten-
+    // Default — User soll nicht versehentlich den Hardcode festschreiben.
+    this.editText = meta?.description ?? '';
+    this.editing.set(cascadeName);
+  }
+
+  /** Escape oder Cancel-Button → Edit-Mode verlassen ohne Save. */
+  cancelEdit(): void {
+    this.editing.set(null);
+    this.editText = '';
+  }
+
+  /**
+   * Save-Button (oder Enter): PUT der neuen description an
+   * `/categories/{name}`. Leerer String → wird als `null` gesendet
+   * (Backend löscht das Feld), damit der Konsument-Default wieder greift.
+   */
+  saveEdit(cascadeName: string): void {
+    const key = cascadeName.toLowerCase();
+    const trimmed = (this.editText ?? '').trim();
+    this.saving.set(true);
+    this.api.updateCategory(key, {
+      description: trimmed.length === 0 ? null : trimmed,
+    }).subscribe({
+      next: () => {
+        // Lokale Metadaten-Liste sofort patchen damit die UI ohne Reload
+        // den neuen Wert zeigt — der nächste reload() würde es zwar auch
+        // holen, aber der UX-Lag wäre sichtbar.
+        const list = [...this.categoriesMeta()];
+        const idx = list.findIndex(c => c.name === key);
+        if (idx >= 0) {
+          list[idx] = { ...list[idx], description: trimmed || null };
+        } else {
+          list.push({ name: key, description: trimmed || null });
+        }
+        this.categoriesMeta.set(list);
+        this.editing.set(null);
+        this.editText = '';
+        this.saving.set(false);
+      },
+      error: (e) => {
+        console.error('[ki-cascades-view] saveEdit failed', e);
+        this.saving.set(false);
+      },
+    });
   }
 
   hasCooldown(c: Cascade): boolean {
