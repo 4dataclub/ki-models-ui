@@ -271,3 +271,53 @@ export const FAILOVER_CHAIN_LABELS_EN: FailoverChainLabels = {
   hint: 'On quota error, the wrapper switches to the next stage and restarts.',
   emptyState: 'No stages configured. Add one to start.',
 };
+
+/**
+ * Labels für `<ki-routing-decisions>` (Phase v0.11.0). Konsumenten überschreiben
+ * via [labels]-Input; Defaults sind englisch.
+ */
+export interface RoutingDecisionsLabels {
+  title: string;
+  subtitle: string;
+  statSize: string;
+  statHits: string;
+  statMisses: string;
+  statFailures: string;
+  testLabel: string;
+  testPlaceholder: string;
+  btnTest: string;
+  testing: string;
+  entriesTitle: string;
+  btnClearAll: string;
+  btnClearOne: string;
+  loading: string;
+  empty: string;
+  colPurpose: string;
+  colCategory: string;
+  colExpires: string;
+  colActions: string;
+  confirmClearAll: string;
+}
+
+export const ROUTING_DECISIONS_LABELS_EN: RoutingDecisionsLabels = {
+  title: 'Semantic Routing Cache',
+  subtitle: 'Recent task-description → category routing decisions. Cached 24h.',
+  statSize: 'Cached',
+  statHits: 'Hits',
+  statMisses: 'Misses',
+  statFailures: 'Fallbacks',
+  testLabel: 'Test a task description',
+  testPlaceholder: 'e.g. "translate German i18n keys to English"',
+  btnTest: 'Route it',
+  testing: 'Routing…',
+  entriesTitle: 'Cache entries',
+  btnClearAll: 'Clear all',
+  btnClearOne: 'Remove entry',
+  loading: 'Loading…',
+  empty: 'No routing decisions cached yet. Test one above, or wait for a real `purpose`-call.',
+  colPurpose: 'Task description',
+  colCategory: 'Chosen category',
+  colExpires: 'Expires in',
+  colActions: 'Actions',
+  confirmClearAll: 'Clear the entire routing cache? All future requests will be re-routed.',
+};

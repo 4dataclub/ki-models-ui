@@ -7,6 +7,7 @@ import { ApiKeySetting, ApiKeySettingUpdate } from '../models/api-key-setting';
 import { CascadeConfig, CascadeConfigUpdate } from '../models/cascade-config';
 import { Cascade } from '../models/cascade';
 import { Category, CategoryUpdate } from '../models/category';
+import { RoutingCache, RoutingTestResult } from '../models/routing';
 
 /**
  * Library-API-Service. Spricht alle KI-Modell-/API-Key-/Cascade-Endpoints
@@ -188,5 +189,42 @@ export class KiModelsApiService {
 
   setCascadeConfig(body: CascadeConfigUpdate): Observable<CascadeConfig> {
     return this.http.put<CascadeConfig>(`${this.base}/cascade-config`, body);
+  }
+
+  // ─── Semantic Routing (Phase v0.11.0 — llm-cascade ≥ 0.6.0) ──────────────
+
+  /**
+   * Snapshot des Routing-Caches mit Counter-Stats. Wird vom
+   * `<ki-routing-decisions>`-Component periodisch geladen damit der User
+   * sieht welche purpose-Strings auf welche Kategorie geroutet wurden.
+   */
+  getRoutingCache(): Observable<RoutingCache> {
+    return this.http.get<RoutingCache>(`${this.base}/routing/cache`);
+  }
+
+  /** Kompletter Cache leeren — User-Aktion im UI. */
+  clearRoutingCache(): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(`${this.base}/routing/cache`);
+  }
+
+  /** Einzelnen Cache-Eintrag (per purposeHash) entfernen. */
+  clearRoutingCacheEntry(purposeHash: string): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(
+      `${this.base}/routing/cache/${encodeURIComponent(purposeHash)}`,
+    );
+  }
+
+  /**
+   * Test-Modus: einen purpose probe-routen ohne den eigentlichen Generate-
+   * Call durchzufuehren. Cached das Ergebnis trotzdem (sodass der naechste
+   * echte Call den gleichen Pfad nimmt). Praktisch um zu sehen welche
+   * Kategorie der Router fuer eine bestimmte Task-Beschreibung waehlen
+   * wuerde, bevor man's live ausrollt.
+   */
+  testRouting(purpose: string): Observable<RoutingTestResult> {
+    return this.http.post<RoutingTestResult>(
+      `${this.base}/routing/test`,
+      { purpose },
+    );
   }
 }
