@@ -307,6 +307,92 @@ Routing-Pfad.** Du als Admin definierst nur die Kategorien + descriptions.
 
 ---
 
+## Konsumenten-Unterschied: Auto vs. Manuell
+
+Nicht jeder Konsument will dass das System komplett autonom entscheidet.
+EduPro vertraut Auto-Escalation, **Switcher will manuelle Kontrolle**.
+
+```
+Switcher heute:                                Switcher Vision (v0.12.0 mit Pattern):
+─────────────────                              ──────────────────────────────────────
+User: Provider wechseln manuell                 User: purpose="..." + escalate-Toggle
+   ↓                                                ↓
+Switcher routet hart auf                          Semantic Router liest descriptions:
+einen ausgewählten Provider                         cloud: "Premium, voller Cooldown"
+                                                    free-only: "Kostenfrei, rate-limited"
+                                                    local: "Ollama lokal" ← description
+                                                                            sagt was er kann
+                                                    ↓
+                                                  Simple Tasks → free-only / local
+                                                  Komplexe Tasks → cloud (last resort)
+                                                    ↓
+                                                  Auto-Escalation bei „Output reicht nicht"
+                                                  ABER: User kann pro Anfrage sagen
+                                                  „bleib bei Tier X, escaliere NIE auf Cloud"
+```
+
+**Wie die Library das löst — neuer Input `[escalationMode]`:**
+
+```html
+<!-- Switcher: User entscheidet manuell -->
+<ki-cascades-view
+  [escalationMode]="userMode"          <!-- 'auto' | 'manual' -->
+  [manualTier]="0"                     <!-- nur bei 'manual' relevant -->
+  (escalationModeChange)="userMode = $event"
+></ki-cascades-view>
+
+<!-- EduPro: läuft autonom, kein Toggle -->
+<ki-cascades-view [escalationMode]="'auto'"></ki-cascades-view>
+```
+
+**Was im UI dabei sichtbar wird (Switcher):**
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  ◆ Escalation-Modus:  (◉) Auto    ( ) Manuell — Stop bei Tier 0   │
+│                                                                     │
+│  Auto:    Backend escaliert bei Validator-Fail auf nächsten Tier  │
+│  Manuell: Bleibt im selektierten Tier. Kein Cloud-Switching.      │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**Konsumenten-Konfig-Tabelle:**
+
+| App | Default-Modus | UI-Toggle? | Use-Case |
+|---|---|---|---|
+| **EduPro** | `auto` | nein, transparent | System soll selbst entscheiden |
+| **Switcher** | `manual` | ja, prominent | User will Kontrolle, Datenschutz |
+| **andere zukünftige Apps** | wählbar | beliebig | konsumenten-spezifisch |
+
+---
+
+## Hardware-Safety (v0.7.0 — geplant)
+
+**Anforderung:** Die Library darf keine Modelle als „aktivierbar" anbieten,
+wenn die Server-Hardware nicht reicht. Sonst killt ein zu großes Ollama-
+Modell den ganzen Server beim Laden.
+
+**Backend (llm-cascade ≥ 0.7.0) liefert pro Modell:**
+
+```ts
+interface AiModel {
+  ...
+  hardwareCompatible?: boolean;  // false = Server kann das nicht
+  hardwareReason?: string;       // "Modell braucht 18 GB, frei nur 4.5 GB"
+}
+```
+
+**Library-Verhalten:**
+- `<ki-models-table>` zeigt für `hardwareCompatible=false` ein rotes Badge
+  „Hardware unzureichend" + Tooltip mit `hardwareReason`
+- Toggle-Button ist disabled (Modell kann nicht enabled werden)
+- `<ki-add-model-form>` zeigt beim Submit eine Warnung wenn das gewählte
+  Modell zu groß ist — User muss bewusst bestätigen oder andere Größe wählen
+
+→ **Der User kann den Server NICHT versehentlich lahmlegen.**
+
+---
+
 ## Hardware-Realitäts-Check
 
 Lokale Modelle hängen an Server-Hardware:
