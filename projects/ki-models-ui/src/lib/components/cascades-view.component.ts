@@ -59,9 +59,36 @@ import {
           <!-- Header -->
           <header class="mb-4 flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
-              <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wide">
-                {{ titleFor(c.name) }}
-              </h3>
+              <!-- Inline-Edit für displayName (v0.11.2). Click auf den Title →
+                   Input. Enter speichert, Escape bricht ab. -->
+              <ng-container *ngIf="editingTitle() !== c.name">
+                <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wide cursor-pointer hover:text-emerald-700 dark:hover:text-emerald-400 transition"
+                    [title]="L.editTitleTooltip"
+                    (click)="startEditTitle(c.name)">
+                  {{ titleFor(c.name) }}
+                </h3>
+              </ng-container>
+              <ng-container *ngIf="editingTitle() === c.name">
+                <input type="text"
+                       class="w-full text-lg font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wide px-2 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                       [(ngModel)]="editTitleText"
+                       [placeholder]="L.editTitlePlaceholder"
+                       (keydown.enter)="$event.preventDefault(); saveEditTitle(c.name)"
+                       (keydown.escape)="cancelEditTitle()"
+                       autofocus />
+                <div class="mt-1 flex gap-2 text-[10px]">
+                  <button (click)="saveEditTitle(c.name)"
+                          [disabled]="savingTitle()"
+                          class="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold uppercase tracking-wide">
+                    {{ L.editHintSave }}
+                  </button>
+                  <button (click)="cancelEditTitle()"
+                          [disabled]="savingTitle()"
+                          class="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 text-slate-700 dark:text-slate-200 font-bold uppercase tracking-wide">
+                    {{ L.editHintCancel }}
+                  </button>
+                </div>
+              </ng-container>
 
               <!-- Inline-Edit für description (v0.10.0). Click auf den Text →
                    Textarea. Enter speichert, Escape bricht ab, Blur speichert.
@@ -199,6 +226,15 @@ export class CascadesViewComponent implements OnInit {
   readonly editing = signal<string | null>(null);
   editText = '';
   readonly saving = signal(false);
+
+  /**
+   * v0.11.2 — separates Edit-State für displayName. Title + Description
+   * können nicht gleichzeitig editiert werden — das Edit-Modell ist
+   * exclusive pro Cascade-Card.
+   */
+  readonly editingTitle = signal<string | null>(null);
+  editTitleText = '';
+  readonly savingTitle = signal(false);
 
   /**
    * v0.11.1 — beim Klick auf das Trash-Icon wird der Cascade-Name hier
@@ -341,6 +377,53 @@ export class CascadesViewComponent implements OnInit {
 
   hasCooldown(c: Cascade): boolean {
     return c.cooldownSec && Object.keys(c.cooldownSec).length > 0;
+  }
+
+  /**
+   * v0.11.2 — Inline-Edit für displayName. Click auf den Title öffnet ein
+   * Input-Feld. Persistiert via PUT /api/categories/{name} mit nur dem
+   * displayName-Feld (description bleibt unangetastet).
+   */
+  startEditTitle(cascadeName: string): void {
+    const key = cascadeName.toLowerCase();
+    const meta = this.categoriesMeta().find(c => c.name === key);
+    // Vorgeladener Text: NUR der persistierte displayName, NICHT der
+    // capitalized Fallback — User soll nicht versehentlich den Fallback
+    // als seinen eigenen Wert festschreiben.
+    this.editTitleText = meta?.displayName ?? '';
+    this.editingTitle.set(cascadeName);
+  }
+
+  cancelEditTitle(): void {
+    this.editingTitle.set(null);
+    this.editTitleText = '';
+  }
+
+  saveEditTitle(cascadeName: string): void {
+    const key = cascadeName.toLowerCase();
+    const trimmed = (this.editTitleText ?? '').trim();
+    this.savingTitle.set(true);
+    this.api.updateCategory(key, {
+      displayName: trimmed.length === 0 ? null : trimmed,
+    }).subscribe({
+      next: () => {
+        const list = [...this.categoriesMeta()];
+        const idx = list.findIndex(c => c.name === key);
+        if (idx >= 0) {
+          list[idx] = { ...list[idx], displayName: trimmed || null };
+        } else {
+          list.push({ name: key, displayName: trimmed || null });
+        }
+        this.categoriesMeta.set(list);
+        this.editingTitle.set(null);
+        this.editTitleText = '';
+        this.savingTitle.set(false);
+      },
+      error: (e) => {
+        console.error('[ki-cascades-view] saveEditTitle failed', e);
+        this.savingTitle.set(false);
+      },
+    });
   }
 
   /**
