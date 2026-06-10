@@ -214,11 +214,29 @@ export class AddModelFormComponent {
       'gemini-3-flash-preview',
       'gemini-3-pro-preview',
     ],
+    // Ollama-Vorschläge — sortiert grob nach Größe (klein → groß).
+    // Kleine Modelle (≤7B) laufen auf CPU-only-Servern; größere brauchen GPU
+    // mit min. der angegebenen VRAM. Die ID ist nur ein Tipp im Dropdown —
+    // Ollama pullt das Modell beim ersten Call automatisch wenn lokal nicht
+    // vorhanden. Wer auf einer Firmen-Maschine mit 16+ GB VRAM arbeitet,
+    // wählt entsprechend größere Modelle für mehr Qualität.
     ollama: [
-      'gemma3:4b',
-      'gemma3:12b',
-      'qwen2.5:7b',
-      'llama3.2:3b',
+      // ── Klein (CPU-tauglich, < 8 GB RAM) ──
+      'llama3.2:3b',           // 2 GB
+      'gemma3:4b',             // 3 GB
+      'qwen2.5:7b-instruct',   // 5 GB (knapp auf 8 GB RAM)
+      'gemma3:12b',            // 8 GB (braucht GPU für gute Speed)
+      // ── Mittel (GPU empfohlen, 12-16 GB VRAM) ──
+      'gemma2:27b',            // ~16 GB VRAM
+      'qwen2.5:14b-instruct',  // ~10 GB VRAM
+      'llama3.1:8b',           // 6 GB VRAM
+      // ── Groß (16-24 GB VRAM, Firmen-Hardware) ──
+      'gemma4:24b',            // ~16 GB VRAM (analog XDA-Artikel)
+      'qwen3-coder:30b',       // ~18 GB VRAM (Coding-Workhorse)
+      'qwen2.5:32b-instruct',  // ~20 GB VRAM
+      // ── Sehr groß (40+ GB VRAM / Multi-GPU) ──
+      'llama3.1:70b',          // ~40 GB VRAM
+      'qwen2.5:72b-instruct',  // ~45 GB VRAM
     ],
     openai: [
       'gpt-4o',
@@ -234,10 +252,19 @@ export class AddModelFormComponent {
       'claude-haiku-4-5-20251001',
     ],
     openrouter: [
+      // Cloud-Hosted-Variante grosser Open-Source-Modelle — wenn man die
+      // selbe Modell-Familie nutzen will ohne eigene GPU-Hardware. Praktisch
+      // als Mittel-Tier zwischen lokal-klein und Premium-Cloud.
       'deepseek/deepseek-v4-flash',
       'deepseek/deepseek-v4-pro',
       'deepseek/deepseek-chat-v3.1',
+      'meta-llama/llama-3.3-70b-instruct',
       'meta-llama/llama-3.3-70b-instruct:free',
+      'meta-llama/llama-3.1-405b-instruct',
+      'qwen/qwen3-coder-30b',
+      'qwen/qwen-2.5-72b-instruct',
+      'google/gemma-4-24b',
+      'google/gemma-2-27b-it',
       'openai/gpt-oss-120b:free',
     ],
     deepseek: [
