@@ -41,8 +41,41 @@ import { QualityStatRow } from '../models/quality';
             <option value="best-first">Beste zuerst</option>
             <option value="calls-desc">Meist genutzte zuerst</option>
           </select>
-          <button (click)="reload()" class="ki-btn-refresh">↻</button>
+          <button (click)="reload()" class="ki-btn-refresh" title="Tabelle neu laden">↻</button>
+          <!--
+            v0.12.1: Manueller Auto-Disable-Trigger. Sichtbar nur wenn das
+            Backend-Feature aktiv ist (autoDisableEnabled signal). Sonst
+            wäre's verwirrend einen Button zu zeigen der nichts macht.
+            Tipp: Default-disabled solange noch geladen wird → kein
+            Doppel-Klick beim Spam-Klicker.
+          -->
+          <button *ngIf="autoDisableEnabled()"
+                  (click)="runAutoDisable()"
+                  [disabled]="running()"
+                  class="ki-btn-autodisable"
+                  title="Killt jetzt sofort alle Modelle mit Tier=kill und genügend Calls — der Hintergrund-Job läuft sonst alle 6h">
+            {{ running() ? 'Läuft…' : '✗ Auto-Disable jetzt' }}
+          </button>
         </div>
+      </div>
+
+      <!-- v0.12.1: Result-Banner nach manuellem Run. Wird nach 8s
+           ausgeblendet, kann via X-Klick weg-geklickt werden. Grün wenn
+           was gekillt wurde, neutral wenn nichts zu tun war. -->
+      <div *ngIf="lastResult() as r"
+           class="ki-result-banner"
+           [class.ki-result-killed]="r.disabled.length > 0"
+           [class.ki-result-noop]="r.disabled.length === 0">
+        <strong *ngIf="r.disabled.length > 0">
+          ✗ {{ r.disabled.length }} Modell{{ r.disabled.length === 1 ? '' : 'e' }} auto-disabled
+        </strong>
+        <strong *ngIf="r.disabled.length === 0">
+          ✓ Nichts zu tun — keine kill-Tier-Modelle mit ≥{{ autoDisableMinCalls() }} Calls
+        </strong>
+        <span class="ki-tiny ki-muted ki-result-detail" *ngIf="r.disabled.length > 0">
+          {{ r.disabled.join(', ') }}
+        </span>
+        <button class="ki-result-dismiss" (click)="lastResult.set(null)" title="schließen">✕</button>
       </div>
 
       <p *ngIf="loading()" class="ki-muted">Lade Quality-Stats…</p>
@@ -108,6 +141,27 @@ import { QualityStatRow } from '../models/quality';
       padding: 0.35rem 0.6rem; background: #e0e7ff; color: #3730a3;
       border: none; border-radius: 0.375rem; font-size: 0.8rem; cursor: pointer;
     }
+    .ki-btn-autodisable {
+      padding: 0.35rem 0.7rem; background: #fee2e2; color: #991b1b;
+      border: 1px solid #fecaca; border-radius: 0.375rem;
+      font-size: 0.7rem; font-weight: 700; cursor: pointer;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .ki-btn-autodisable:hover { background: #fecaca; }
+    .ki-btn-autodisable:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ki-result-banner {
+      display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+      padding: 0.7rem 0.9rem; border-radius: 0.5rem; margin-bottom: 0.75rem;
+      font-size: 0.8rem;
+    }
+    .ki-result-killed { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+    .ki-result-noop   { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+    .ki-result-detail { flex: 1; min-width: 0; word-break: break-all; }
+    .ki-result-dismiss {
+      background: transparent; border: none; color: inherit; cursor: pointer;
+      font-weight: 700; padding: 0 0.25rem; opacity: 0.6;
+    }
+    .ki-result-dismiss:hover { opacity: 1; }
     .ki-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .ki-table thead tr { border-bottom: 2px solid #e2e8f0; }
     .ki-table th {
@@ -148,8 +202,35 @@ export class ModelsQualityStatsComponent implements OnInit {
   readonly rows = signal<QualityStatRow[]>([]);
   readonly loading = signal(true);
 
+  // v0.12.1: Auto-Disable-Trigger
+  readonly running = signal(false);
+  readonly autoDisableEnabled = signal(false);
+  readonly autoDisableMinCalls = signal(50);
+  readonly lastResult = signal<{ disabled: string[] } | null>(null);
+  /** Hide result-banner nach 8s. Timer-Ref damit reload nicht zwei Timer parallel laufen lässt. */
+  private resultTimer: ReturnType<typeof setTimeout> | null = null;
+
   ngOnInit(): void {
     this.reload();
+    this.loadAutoDisableConfig();
+  }
+
+  /**
+   * Holt einmal beim Mount die Auto-Disable-Config. Bei Backend &lt; 0.7.3
+   * (kein Endpoint) bleibt {@link autoDisableEnabled} false → der Button
+   * wird gar nicht erst sichtbar. Saubere Backward-Compat.
+   */
+  private loadAutoDisableConfig(): void {
+    this.api.getQualityAutoDisableConfig().subscribe({
+      next: (cfg) => {
+        this.autoDisableEnabled.set(!!cfg?.enabled);
+        if (cfg?.minCalls) this.autoDisableMinCalls.set(cfg.minCalls);
+      },
+      error: () => {
+        // Endpoint nicht da → Feature einfach nicht zeigen.
+        this.autoDisableEnabled.set(false);
+      },
+    });
   }
 
   reload(): void {
@@ -163,6 +244,37 @@ export class ModelsQualityStatsComponent implements OnInit {
         // Backend < 0.7.2: leere Liste, kein Crash
         this.rows.set([]);
         this.loading.set(false);
+      },
+    });
+  }
+
+  /**
+   * v0.12.1: triggert den Auto-Disable-Job im Backend, zeigt das Ergebnis
+   * im Banner und lädt die Stats-Tabelle neu (damit die jetzt-disabled-
+   * Modelle ihre neue {@code autoDisabled=true}-Markierung kriegen — die
+   * Tabelle zeigt zwar nicht direkt das autoDisabled-Feld, aber das
+   * UI-„DISABLE"-Badge basiert auf der frischen Server-Antwort).
+   *
+   * Bei Backend-Fehler (z.B. Endpoint nicht da): kurze rote Fallback-
+   * Meldung „nicht verfügbar". Der Button bleibt nutzbar.
+   */
+  runAutoDisable(): void {
+    if (this.running()) return;
+    this.running.set(true);
+    if (this.resultTimer) { clearTimeout(this.resultTimer); this.resultTimer = null; }
+
+    this.api.runQualityAutoDisable().subscribe({
+      next: (report) => {
+        this.lastResult.set({ disabled: report?.disabled ?? [] });
+        this.running.set(false);
+        this.reload();
+        // Banner nach 8s automatisch zumachen — User muss nicht klicken.
+        this.resultTimer = setTimeout(() => this.lastResult.set(null), 8000);
+      },
+      error: () => {
+        this.lastResult.set({ disabled: [] });
+        this.running.set(false);
+        this.resultTimer = setTimeout(() => this.lastResult.set(null), 5000);
       },
     });
   }
