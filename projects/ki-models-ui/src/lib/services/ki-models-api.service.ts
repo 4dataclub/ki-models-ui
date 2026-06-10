@@ -8,6 +8,7 @@ import { CascadeConfig, CascadeConfigUpdate } from '../models/cascade-config';
 import { Cascade } from '../models/cascade';
 import { Category, CategoryUpdate } from '../models/category';
 import { RoutingCache, RoutingTestResult } from '../models/routing';
+import { QualityStatRow } from '../models/quality';
 
 /**
  * Library-API-Service. Spricht alle KI-Modell-/API-Key-/Cascade-Endpoints
@@ -226,5 +227,18 @@ export class KiModelsApiService {
       `${this.base}/routing/test`,
       { purpose },
     );
+  }
+
+  // ─── Quality-Stats (v0.7.1 — llm-cascade ≥ 0.7.2) ────────────────────────
+
+  /**
+   * Liefert Quality-Bewertung pro Modell aus den letzten 30 Tagen.
+   * Default-Sortierung „worst-first": KILL-Kandidaten und schlechte Modelle
+   * stehen oben, damit Admin Probleme sofort sieht.
+   *
+   * @param sortBy 'worst-first' (Default) | 'best-first' | 'calls-desc'
+   */
+  getQualityStats(sortBy: 'worst-first' | 'best-first' | 'calls-desc' = 'worst-first'): Observable<QualityStatRow[]> {
+    return this.http.get<QualityStatRow[]>(`${this.base}/stats/quality?sortBy=${sortBy}`);
   }
 }
