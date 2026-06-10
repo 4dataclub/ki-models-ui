@@ -232,6 +232,10 @@ export interface CascadesViewLabels {
   deleteMetaTooltip: string;
   /** Confirm-Dialog-Text vor dem DELETE — bekommt den Anzeige-Titel der Cascade. */
   deleteMetaConfirm: (cascadeTitle: string) => string;
+  /** Tooltip für die klickbare Title-Zeile (v0.11.2 displayName Inline-Edit). */
+  editTitleTooltip: string;
+  /** Placeholder im Title-Input wenn leer (v0.11.2). */
+  editTitlePlaceholder: string;
 }
 
 export const CASCADES_VIEW_LABELS_EN: CascadesViewLabels = {
@@ -249,6 +253,8 @@ export const CASCADES_VIEW_LABELS_EN: CascadesViewLabels = {
   deleteMetaTooltip: 'Delete display texts (models stay)',
   deleteMetaConfirm: (title) =>
     `Delete display texts for "${title}"? Models stay; remove them in the Models table to make the cascade disappear entirely.`,
+  editTitleTooltip: 'Click to edit display name',
+  editTitlePlaceholder: 'Display name (e.g. "Free Only — Rate-Limited")…',
 };
 
 export interface FailoverChainLabels {
