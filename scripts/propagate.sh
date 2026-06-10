@@ -106,7 +106,9 @@ for entry in "${CONSUMERS[@]}"; do
     fi
   fi
 
-  # Neuen Tarball kopieren
+  # Neuen Tarball kopieren — vendor/-Ordner notfalls neu anlegen (git entfernt
+  # leere Ordner nach `git rm` der letzten Datei, deshalb mkdir -p defensiv).
+  mkdir -p "$FRONTEND_ROOT/vendor"
   echo "    → kopiere $TARBALL_NAME nach vendor/"
   cp "$TARBALL_PATH" "$FRONTEND_ROOT/vendor/"
 
