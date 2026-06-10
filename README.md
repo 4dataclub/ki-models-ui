@@ -182,6 +182,153 @@ Auftreten in der Modell-Liste (= globaler `orderIdx`).
 
 ---
 
+## Kategorien als Tiers — die zentrale Architektur-Idee
+
+Die `category_meta.orderIdx` ist nicht nur „UI-Sortierung" — sie definiert
+**Eskalations-Tiers**. Lokale, billige Modelle stehen in Tier 0; Cloud-Premium
+in Tier N. Wenn ein Modell die Aufgabe nicht packt, eskaliert llm-cascade
+automatisch auf das nächste Tier (Auto-Escalation, ab `llm-cascade ≥ 0.7.0`).
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  Kategorien WERDEN zu Tiers                                          │
+│                                                                       │
+│  category    orderIdx   Modelle                  Tier-Charakter      │
+│  ────────    ────────   ───────────────────────  ─────────────────── │
+│  utility            0   ollama:llama3.2:3b       Tier 0: lokal,     │
+│                         ollama:gemma3:4b           simpel, gratis    │
+│                                                                       │
+│  content            1   gemini-2.5-flash         Tier 1: Cloud      │
+│                         gemini-2.5-flash-lite      mittel, billig    │
+│                                                                       │
+│  dev                2   gemini-2.5-pro           Tier 2: Cloud      │
+│                         claude-opus-4-7            premium, komplex  │
+│                                                                       │
+│  general           99   (was übrig bleibt)       globaler Fallback  │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Was du als Admin im UI definierst** (alles ohne Code-Edit):
+- **Kategorien + descriptions** — Semantic Router weiß was wofür
+- **`orderIdx`** — Tier-Reihenfolge für Eskalation
+- **Modelle pro Kategorie** — was probiert wird
+
+→ User-controllable, ohne Neustart wirksam (Cache wird bei jedem
+`PUT /categories/{name}` invalidiert).
+
+---
+
+## Drei Routing-Mechanismen
+
+Der Caller hat drei Möglichkeiten, wie er die Cascade nutzt. Sie kombinieren
+sich beliebig:
+
+### 1. Explizite Kategorie (klassisch, immer verfügbar)
+
+```ts
+POST /api/generate
+{ "prompt": "...", "category": "content" }
+```
+
+llm-cascade probiert nur Modelle mit `category=content` (plus `general` als
+Fallback). Failover bei HTTP-Fehler innerhalb derselben Kategorie.
+
+### 2. Semantic Routing via `purpose` (seit v0.6.0 — live)
+
+```ts
+POST /api/generate
+{ "prompt": "...", "purpose": "übersetze deutsche i18n keys nach französisch" }
+```
+
+llm-cascade macht einen Mini-LLM-Call mit den `category_meta.description`-
+Texten und entscheidet welche Kategorie passt. Resultat wird gecached
+(LRU 1000 Slots, 24h TTL, key = SHA-256 des purpose). Cache invalidiert
+sich automatisch bei jedem `PUT/DELETE /api/categories/{name}`.
+
+### 3. Auto-Escalation via `escalate` (geplant — v0.7.0)
+
+```ts
+POST /api/generate
+{
+  "prompt": "Generiere Mathe-Übung 7. Klasse",
+  "purpose": "Lehrcontent für Schulkinder",
+  "escalate": true,
+  "validatorSchema": { ... JSON-Schema ... }
+}
+```
+
+llm-cascade entscheidet **alles selbst**:
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  [1] Semantic Router wählt Initial-Tier:                         │
+│      Liest category_meta.description aller Kategorien.           │
+│      → Antwort: „content" (z.B. weil description „Lehrcontent")  │
+│                                                                   │
+│  [2] Versuche Initial-Tier (alle Modelle in content):            │
+│      gemini-2.5-flash → Antwort                                  │
+│      Validator-Pipeline:                                          │
+│        • JSON.parse() ok?                                        │
+│        • validatorSchema-Match?                                  │
+│        • Quality-Heuristik (Refusal-Phrasen, Min-Length)         │
+│      ✗ Schema-fail → ESCALATE                                    │
+│                                                                   │
+│  [3] Auto-Escalation auf nächstes Tier (orderIdx +1):            │
+│      → Tier „dev"                                                │
+│      gemini-2.5-pro → Antwort                                    │
+│      Validator → ✓ pass → RETURN                                 │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Vorteil:** Caller-Code wird minimal — er braucht nichts über Modelle
+wissen, nur seinen `purpose` beschreiben und ein Schema mitschicken.
+
+---
+
+## Dynamisches Routing pro Caller — Beispiel-Use-Cases
+
+Jeder Caller (Service, Agent) liefert seinen eigenen `purpose`. Der Router
+entscheidet pro Call individuell:
+
+```
+ExercisePoolService          purpose="Mathe-Übung 7. Klasse"           → content
+VocabularyI18nService        purpose="übersetze i18n keys nach FR"     → utility
+ExamGeneratorService         purpose="Prüfung schwierig + Erklärungen" → content/dev
+TesterAgent                  purpose="Test-Cases für UserService Java" → dev
+BackendAgent                 purpose="Spring Boot Endpoint generieren" → dev
+FrontendAgent                purpose="Angular Component User-Profil"   → dev
+ProjektleiterAgent           purpose="Sprint-Plan aus 12 PRs"          → content/dev
+ChatAgent (kindgerecht)      purpose="Schüler-Chat Photosynthese"      → content
+SwitcherClaude (lokal-first) purpose="schneller Refactor Java"         → free-only/local
+```
+
+→ **Eine Cascade-API, beliebig viele Caller, jeder bekommt seinen optimalen
+Routing-Pfad.** Du als Admin definierst nur die Kategorien + descriptions.
+
+---
+
+## Hardware-Realitäts-Check
+
+Lokale Modelle hängen an Server-Hardware:
+
+| Modell                | RAM-Bedarf | Status auf CPU-Only mit 8 GB RAM |
+|-----------------------|-----------:|----------------------------------|
+| `llama3.2:3b`         | ~2 GB      | ✓ stabil                         |
+| `gemma3:4b`           | ~3 GB      | ✓ stabil                         |
+| `qwen2.5:7b-instruct` | ~5 GB      | ✗ OOM-Crash beim Laden          |
+| `qwen3-coder:30b`     | ~18 GB     | ✗ braucht GPU mit 24 GB VRAM    |
+| `gemma4:24b`          | ~16 GB     | ✗ braucht GPU mit 16 GB VRAM    |
+| `llama3.1:70b`        | ~40 GB     | ✗ braucht GPU-Cluster           |
+
+**Konsequenz:** Auf CPU-Only-Servern stehen in Tier 0 nur 3-4B-Modelle.
+Tier 1+ MUSS Cloud sein. Für „echtes lokal-only" → 16+ GB VRAM-Hardware.
+
+Die Library schreibt das aber nicht vor — wer Firma-Hardware hat, kann
+auch `qwen3-coder:30b` oder `gemma4:24b` in `utility` packen. Die
+Vorschlagsliste im Add-Form (v0.11.5) deckt beides ab.
+
+---
+
 ## Backend-Vertrag
 
 Konsumenten-Backend muss folgende Endpoints unter der konfigurierten Base
