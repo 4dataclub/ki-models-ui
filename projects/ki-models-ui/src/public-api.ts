@@ -14,6 +14,7 @@ export * from './lib/models/cascade-config';
 export * from './lib/models/cascade';
 export * from './lib/models/category';
 export * from './lib/models/routing';
+export * from './lib/models/quality';
 export * from './lib/models/labels';
 
 // ─── Service + InjectionToken ────────────────────────────────────────────
@@ -28,3 +29,4 @@ export * from './lib/components/api-keys-section.component';
 export * from './lib/components/failover-chain.component';
 export * from './lib/components/cascades-view.component';
 export * from './lib/components/routing-decisions.component';
+export * from './lib/components/models-quality-stats.component';

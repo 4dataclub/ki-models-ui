@@ -1,4 +1,24 @@
 /**
+ * v0.7.1 — Quality-Info pro Modell, basierend auf llm_call_log der letzten
+ * 30 Tage. Wird vom Backend (llm-cascade ≥ 0.7.1) in `GET /api/models` und
+ * `GET /api/stats/quality` zurückgeliefert.
+ *
+ * Score-Skala:
+ *  - `★ top`  ≥ 0.7  — Top-Modell, halte vorne in Cascade
+ *  - `◐ ok`   0.4-0.7 — OK, im Mittelfeld
+ *  - `▽ weak` 0.1-0.4 — Schwach, als Fallback
+ *  - `✗ kill` < 0.1   — KILL-Kandidat, sollte raus
+ *  - `unknown` — noch keine Daten
+ */
+export interface ModelQuality {
+  score: number;
+  tier: 'top' | 'ok' | 'weak' | 'kill' | 'unknown';
+  successRate: number;
+  avgChars: number;
+  callsLast30d: number;
+}
+
+/**
  * Routing-Kategorie für die Cascade. Frei wählbarer Identifier
  * (`[a-z0-9_-]{1,50}` — siehe llm-cascade `ApiController.normalizeCategory`).
  * Die gültigen Kategorien leben in der DB des Konsumenten, nicht im Code:
@@ -82,6 +102,27 @@ export interface AiModel {
    * Optional, defaultet auf false bei aelteren Backends (Backward-Compat).
    */
   keyless?: boolean;
+
+  /**
+   * v0.7.0 — Hardware-Check (llm-cascade ≥ 0.7.0). Wenn false, kann das
+   * Modell nicht aktiviert werden — Server-RAM/VRAM reicht nicht.
+   * Optional, defaultet auf true (Backward-Compat zu älterem Backend).
+   */
+  hardwareCompatible?: boolean;
+  /** v0.7.0 — Lesbare Begründung warum das Modell nicht passt. */
+  hardwareReason?: string | null;
+
+  /**
+   * v0.7.1 — Provider-Server-Name (z.B. „localhost" oder „gpu-firma").
+   * llm-cascade resolved das zu einer Base-URL. Wenn null: Default-Server.
+   */
+  providerServerName?: string | null;
+
+  /**
+   * v0.7.1 — Quality-Info aus llm_call_log der letzten 30 Tage.
+   * Wenn das Backend < 0.7.1 ist, ist das undefined → UI verbirgt die Spalte.
+   */
+  quality?: ModelQuality;
 
   /** Aktuelle Cooldown-Restzeit in Sekunden (Backend kalkuliert). */
   cooldownRemainingSec?: number;
