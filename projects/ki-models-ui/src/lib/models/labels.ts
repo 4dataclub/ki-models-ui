@@ -20,6 +20,8 @@ export interface ModelsTableLabels {
   colActions: string;
   keySet: string;
   keyMissing: string;
+  /** v0.11.3 — Badge für Modelle die keinen API-Key brauchen (z.B. Ollama lokal). */
+  keyless: string;
   on: string;
   off: string;
   autoDisabled: string;
@@ -57,6 +59,7 @@ export const MODELS_TABLE_LABELS_EN: ModelsTableLabels = {
   colActions: 'Actions',
   keySet: 'Key set',
   keyMissing: 'Key missing',
+  keyless: 'Local',
   on: 'ON',
   off: 'OFF',
   autoDisabled: 'Auto-disabled',

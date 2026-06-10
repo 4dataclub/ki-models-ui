@@ -71,15 +71,16 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
                     <div *ngIf="m.displayName" class="ki-muted ki-tiny">{{ m.displayName }}</div>
                   </td>
                   <td>
-                    <span *ngIf="m.keyConfigured" class="ki-badge ki-badge-ok">{{ L.keySet }}</span>
-                    <span *ngIf="!m.keyConfigured" class="ki-badge ki-badge-warn">{{ L.keyMissing }}</span>
+                    <span *ngIf="isKeylessModel(m)" class="ki-badge ki-badge-local">{{ L.keyless }}</span>
+                    <span *ngIf="!isKeylessModel(m) && m.keyConfigured" class="ki-badge ki-badge-ok">{{ L.keySet }}</span>
+                    <span *ngIf="!isKeylessModel(m) && !m.keyConfigured" class="ki-badge ki-badge-warn">{{ L.keyMissing }}</span>
                     <div class="ki-tiny ki-mono ki-muted">{{ m.apiKeySettingKey }}</div>
                   </td>
                   <td>
                     <button *ngIf="!m.autoDisabled"
                             (click)="toggle(m)"
-                            [disabled]="!m.enabled && !m.keyConfigured"
-                            [title]="(!m.enabled && !m.keyConfigured) ? L.toggleNeedsKey : ''"
+                            [disabled]="!m.enabled && !m.keyConfigured && !isKeylessModel(m)"
+                            [title]="(!m.enabled && !m.keyConfigured && !isKeylessModel(m)) ? L.toggleNeedsKey : ''"
                             class="ki-toggle"
                             [class.ki-toggle-on]="m.enabled"
                             [class.ki-toggle-off]="!m.enabled">
@@ -115,7 +116,7 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
                     <button (click)="test(m)" class="ki-btn-secondary">{{ L.btnTest }}</button>
                     <span *ngIf="showActiveAction && isActiveModel(m)" class="ki-badge ki-badge-active">{{ L.activeBadge }}</span>
                     <button
-                      *ngIf="showActiveAction && !isActiveModel(m) && m.keyConfigured && !m.autoDisabled"
+                      *ngIf="showActiveAction && !isActiveModel(m) && (m.keyConfigured || isKeylessModel(m)) && !m.autoDisabled"
                       (click)="setActive(m)"
                       class="ki-btn-primary"
                     >{{ L.btnSetActive }}</button>
@@ -176,6 +177,7 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
     }
     .ki-badge-ok { background: #d1fae5; color: #065f46; }
     .ki-badge-warn { background: #fee2e2; color: #991b1b; }
+    .ki-badge-local { background: #dbeafe; color: #1e40af; }
     .ki-badge-error { background: #ef4444; color: white; }
     .ki-toggle {
       padding: 0.25rem 0.6rem;
@@ -273,6 +275,22 @@ export class ModelsTableComponent {
    */
   @Input() categoryOrder: string[] = [];
 
+  /**
+   * v0.11.3 — Konsumenten-spezifische Liste von Provider-Namen die keinen
+   * API-Key brauchen. Zusätzlich zu dem `keyless`-Flag aus dem Backend.
+   *
+   * Beispiele:
+   *  - Switcher: `['anthropic']` — Claude via Max-OAuth (Cookie), kein
+   *    sk-ant-Key nötig. Cascade-Backend ruft anthropic nicht direkt;
+   *    Wrapper handled das.
+   *  - EduPro: `[]` — alle Cloud-Provider brauchen ihren Key, weil EduPro-
+   *    Backend selbst HTTP-Calls an api.anthropic.com etc. macht.
+   *
+   * Default `[]`. Ollama ist immer keyless (vom Backend markiert), egal
+   * was hier steht.
+   */
+  @Input() keylessProviders: string[] = [];
+
   private readonly api = inject(KiModelsApiService);
 
   readonly loading = signal(true);
@@ -369,7 +387,9 @@ export class ModelsTableComponent {
   }
 
   toggle(m: AiModel): void {
-    if (!m.enabled && !m.keyConfigured) return;
+    // v0.11.3 — keyless Modelle (Ollama, oder Konsument-Override für anthropic
+    // via Max-OAuth) duerfen auch ohne keyConfigured aktiviert werden.
+    if (!m.enabled && !m.keyConfigured && !this.isKeylessModel(m)) return;
     this.api.toggleModel(m.id, !m.enabled).subscribe(() => {
       this.modelChanged.emit(m);
       this.reload();
@@ -463,6 +483,16 @@ export class ModelsTableComponent {
   /** True wenn die Zeile zum `activeModelId`-Input passt. */
   isActiveModel(m: AiModel): boolean {
     return !!this.activeModelId && m.modelId === this.activeModelId;
+  }
+
+  /**
+   * v0.11.3 — true wenn das Modell entweder vom Backend als keyless
+   * markiert ist (Ollama lokal) ODER der Provider in der Konsumenten-
+   * Override-Liste steht (Switcher: anthropic via Max-OAuth).
+   */
+  isKeylessModel(m: AiModel): boolean {
+    if (m.keyless === true) return true;
+    return this.keylessProviders.includes(m.provider);
   }
 
   truncate(s: string, n: number): string {

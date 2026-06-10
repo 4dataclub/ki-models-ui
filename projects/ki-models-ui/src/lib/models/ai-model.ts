@@ -75,6 +75,14 @@ export interface AiModel {
   /** True wenn der zugehörige API-Key konfiguriert ist (vom Backend ermittelt). */
   keyConfigured: boolean;
 
+  /**
+   * v0.11.3 — true wenn das Modell keinen API-Key braucht (z.B. Ollama lokal).
+   * Backend (llm-cascade ≥ 0.6.1) liefert das pro Modell. Frontend rendert
+   * dann ein „Lokal"-Badge statt „Key fehlt" und keyConfigured ist immer true.
+   * Optional, defaultet auf false bei aelteren Backends (Backward-Compat).
+   */
+  keyless?: boolean;
+
   /** Aktuelle Cooldown-Restzeit in Sekunden (Backend kalkuliert). */
   cooldownRemainingSec?: number;
 }
