@@ -241,4 +241,45 @@ export class KiModelsApiService {
   getQualityStats(sortBy: 'worst-first' | 'best-first' | 'calls-desc' = 'worst-first'): Observable<QualityStatRow[]> {
     return this.http.get<QualityStatRow[]>(`${this.base}/stats/quality?sortBy=${sortBy}`);
   }
+
+  // ─── Quality Auto-Disable (v0.12.1 — llm-cascade ≥ 0.7.3) ───────────────
+
+  /**
+   * Manueller Trigger für den Auto-Disable-Job. Statt 6h auf den
+   * nächsten {@code @Scheduled}-Tick zu warten, kann der Admin das
+   * Cleanup per Knopfdruck anstoßen.
+   *
+   * Server-Antwort listet auf:
+   * - {@code checked}: wie viele Modelle insgesamt geprüft wurden
+   * - {@code disabled}: Modelle die jetzt gerade auto-disabled wurden
+   * - {@code skippedAlreadyDisabled}: schon vorher auto-disabled
+   * - {@code skippedNotKill}: Tier ist nicht „kill"
+   * - {@code skippedTooFewCalls}: unter dem min-calls Schwellwert
+   *
+   * Bei Backend &lt; 0.7.3 (Endpoint nicht vorhanden): die Component
+   * fängt den 404 und zeigt eine kurze „Feature nicht verfügbar"-Meldung.
+   */
+  runQualityAutoDisable(): Observable<{
+    checked: number;
+    disabled: string[];
+    skippedAlreadyDisabled: string[];
+    skippedNotKill: string[];
+    skippedTooFewCalls: string[];
+  }> {
+    return this.http.post<any>(`${this.base}/quality/run-auto-disable`, {});
+  }
+
+  /**
+   * Status des Auto-Disable-Features — ob aktiv und mit welchen Schwellwerten.
+   * Die UI nutzt das um zu entscheiden ob der „Jetzt Auto-Disable laufen
+   * lassen"-Button überhaupt sichtbar gemacht wird (wenn deaktiviert ist's
+   * verwirrend einen Button zu zeigen).
+   */
+  getQualityAutoDisableConfig(): Observable<{
+    enabled: boolean;
+    minCalls: number;
+    note: string;
+  }> {
+    return this.http.get<any>(`${this.base}/quality/auto-disable-config`);
+  }
 }
