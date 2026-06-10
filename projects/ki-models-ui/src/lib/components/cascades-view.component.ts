@@ -97,10 +97,24 @@ import {
                 </div>
               </ng-container>
             </div>
-            <span *ngIf="c.currentModel"
-                  class="shrink-0 text-[10px] font-mono px-2 py-1 rounded-md bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
-              ● {{ c.currentModel }}
-            </span>
+            <div class="shrink-0 flex items-center gap-1.5">
+              <span *ngIf="c.currentModel"
+                    class="text-[10px] font-mono px-2 py-1 rounded-md bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
+                ● {{ c.currentModel }}
+              </span>
+              <!-- v0.11.1 — Trash-Icon zum Loeschen der category_meta-Zeile
+                   (displayName + description). Sichtbar nur wenn die Cascade
+                   ueberhaupt Custom-Texte hat (sonst gibts nichts zu loeschen).
+                   Modelle bleiben unangetastet — User muss die ueber die
+                   Models-Tabelle einzeln entfernen. -->
+              <button *ngIf="hasMeta(c.name)"
+                      (click)="deleteMeta(c.name)"
+                      [disabled]="deletingMeta() === c.name || editing() === c.name"
+                      [title]="L.deleteMetaTooltip"
+                      class="text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 disabled:opacity-40 disabled:cursor-not-allowed text-base leading-none p-1 rounded transition">
+                ✕
+              </button>
+            </div>
           </header>
 
           <!-- Failover-Chain Editor pro Cascade -->
@@ -185,6 +199,13 @@ export class CascadesViewComponent implements OnInit {
   readonly editing = signal<string | null>(null);
   editText = '';
   readonly saving = signal(false);
+
+  /**
+   * v0.11.1 — beim Klick auf das Trash-Icon wird der Cascade-Name hier
+   * gespeichert bis der DELETE-Roundtrip durch ist. So koennen wir nur den
+   * gerade in Bearbeitung befindlichen Button disablen, nicht alle.
+   */
+  readonly deletingMeta = signal<string | null>(null);
 
   /**
    * Pro Cascade-Name die Chain (Array<{provider, model}>) als computed-Signal.
@@ -320,6 +341,44 @@ export class CascadesViewComponent implements OnInit {
 
   hasCooldown(c: Cascade): boolean {
     return c.cooldownSec && Object.keys(c.cooldownSec).length > 0;
+  }
+
+  /**
+   * v0.11.1 — true wenn fuer diese Kategorie eine `category_meta`-Zeile
+   * im Backend existiert (User hat displayName oder description gesetzt).
+   * Trash-Icon wird nur dann angezeigt — sonst gaebe es nichts zu loeschen.
+   */
+  hasMeta(cascadeName: string): boolean {
+    const key = cascadeName.toLowerCase();
+    const meta = this.categoriesMeta().find(c => c.name === key);
+    if (!meta) return false;
+    const hasTitle = !!meta.displayName && meta.displayName.trim().length > 0;
+    const hasDesc  = !!meta.description && meta.description.trim().length > 0;
+    return hasTitle || hasDesc;
+  }
+
+  /**
+   * v0.11.1 — DELETE der `category_meta`-Zeile. Modelle bleiben unangetastet,
+   * der Cascade-Bereich verschwindet erst wenn auch die Modelle weg sind
+   * (oder umkategoriiert wurden). Nach Erfolg lokales Patchen + Reload.
+   */
+  deleteMeta(cascadeName: string): void {
+    const key = cascadeName.toLowerCase();
+    if (!confirm(this.L.deleteMetaConfirm(this.titleFor(cascadeName)))) return;
+    this.deletingMeta.set(key);
+    this.api.deleteCategoryMeta(key).subscribe({
+      next: () => {
+        // Lokal patchen damit Title + Description sofort auf Fallback gehen
+        const list = this.categoriesMeta().map(c =>
+          c.name === key ? { ...c, displayName: null, description: null } : c);
+        this.categoriesMeta.set(list);
+        this.deletingMeta.set(null);
+      },
+      error: (e) => {
+        console.error('[ki-cascades-view] deleteMeta failed', e);
+        this.deletingMeta.set(null);
+      },
+    });
   }
 
   cooldownEntries(c: Cascade): { key: string; sec: number }[] {

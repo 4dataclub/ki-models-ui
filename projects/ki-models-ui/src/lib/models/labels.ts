@@ -228,6 +228,10 @@ export interface CascadesViewLabels {
   editHintSave: string;
   /** Abbrechen-Button-Label im Edit-Mode (v0.10.0). */
   editHintCancel: string;
+  /** Tooltip beim Trash-Icon das die category_meta löscht (v0.11.1). */
+  deleteMetaTooltip: string;
+  /** Confirm-Dialog-Text vor dem DELETE — bekommt den Anzeige-Titel der Cascade. */
+  deleteMetaConfirm: (cascadeTitle: string) => string;
 }
 
 export const CASCADES_VIEW_LABELS_EN: CascadesViewLabels = {
@@ -242,6 +246,9 @@ export const CASCADES_VIEW_LABELS_EN: CascadesViewLabels = {
   editHintPlaceholder: 'Describe what this cascade is for (e.g. "Premium tier — paid models, own cooldown")…',
   editHintSave: 'Save',
   editHintCancel: 'Cancel',
+  deleteMetaTooltip: 'Delete display texts (models stay)',
+  deleteMetaConfirm: (title) =>
+    `Delete display texts for "${title}"? Models stay; remove them in the Models table to make the cascade disappear entirely.`,
 };
 
 export interface FailoverChainLabels {
