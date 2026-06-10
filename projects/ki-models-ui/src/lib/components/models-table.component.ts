@@ -486,13 +486,22 @@ export class ModelsTableComponent {
   }
 
   /**
-   * v0.11.3 — true wenn das Modell entweder vom Backend als keyless
-   * markiert ist (Ollama lokal) ODER der Provider in der Konsumenten-
-   * Override-Liste steht (Switcher: anthropic via Max-OAuth).
+   * v0.11.4 — true wenn das Modell als „keyless" zu rendern ist (blaues
+   * "Lokal"-Badge statt "Key fehlt"/"Key set").
+   *
+   * Logik:
+   *  1. Backend-keyless (`m.keyless===true`, z.B. Ollama lokal) → IMMER true
+   *  2. Konsument-Override (`keylessProviders.includes(provider)`) + KEIN
+   *     Key konfiguriert → true (Beispiel: Switcher-anthropic ohne sk-ant-Key,
+   *     Wechsel läuft via Max-OAuth ohne API-Call)
+   *  3. Konsument-Override + Key konfiguriert → FALSE — User hat einen Key
+   *     gesetzt, also „Key set" anzeigen + Test geht (Switcher-anthropic mit
+   *     sk-ant-Key → echter api.anthropic.com-Call funktioniert)
+   *  4. Sonst → false (normaler Cloud-Provider mit/ohne Key)
    */
   isKeylessModel(m: AiModel): boolean {
     if (m.keyless === true) return true;
-    return this.keylessProviders.includes(m.provider);
+    return this.keylessProviders.includes(m.provider) && !m.keyConfigured;
   }
 
   truncate(s: string, n: number): string {
