@@ -282,4 +282,23 @@ export class KiModelsApiService {
   }> {
     return this.http.get<any>(`${this.base}/quality/auto-disable-config`);
   }
+
+  // ─── Preferred Category Override (v0.12.2 — llm-cascade ≥ 0.7.5) ────────
+
+  /**
+   * Liest den aktuellen Cascade-Kategorie-Override. Wenn `active=true`,
+   * geht jeder generate-Call ohne explizite category an die gesetzte
+   * Kategorie statt durch den Semantic Router.
+   *
+   * Use-Case: Routing-Decisions-Component nutzt das um anzuzeigen wenn
+   * der Cache irrelevant ist (Override aktiv = Cache wird umgangen).
+   *
+   * Bei Backend &lt; 0.7.5 (Endpoint nicht da): `{category: "", active: false}`
+   * via graceful fallback.
+   */
+  getPreferredCategory(): Observable<{ category: string; active: boolean; note?: string }> {
+    return this.http.get<{ category: string; active: boolean; note?: string }>(
+      `${this.base}/preferred-category`
+    );
+  }
 }
