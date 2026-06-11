@@ -30,6 +30,18 @@ import { RoutingDecisionsLabels, ROUTING_DECISIONS_LABELS_EN } from '../models/l
       <h4 class="ki-title">{{ L.title }}</h4>
       <p class="ki-subtitle">{{ L.subtitle }}</p>
 
+      <!-- v0.12.2: Override-Banner. Erscheint nur wenn preferredCategory
+           gesetzt ist (Bereich-Toggle im Konsumenten-UI aktiv). Cache wird
+           dann nicht genutzt — der Banner erklärt warum die Tabelle unten
+           leer/stale aussieht. -->
+      <div *ngIf="overrideCategory() as cat"
+           class="ki-override-banner">
+        <strong>⚠ Bereich-Override aktiv:</strong>
+        Alle Generate-Calls gehen jetzt an <code>{{ cat }}</code>.
+        Semantic Routing + dieser Cache werden umgangen — die Einträge
+        unten sind Historie.
+      </div>
+
       <!-- Stats-Zeile -->
       <div class="ki-stats" *ngIf="cache() as c">
         <div class="ki-stat">
@@ -179,6 +191,15 @@ import { RoutingDecisionsLabels, ROUTING_DECISIONS_LABELS_EN } from '../models/l
     .ki-muted { color: #94a3b8; }
     .ki-tiny { font-size: 0.7rem; }
     .ki-empty { text-align: center; color: #94a3b8; padding: 1rem; font-size: 0.85rem; }
+    .ki-override-banner {
+      background: #fef3c7; border: 1px solid #fcd34d; color: #92400e;
+      padding: 0.7rem 0.9rem; border-radius: 0.5rem;
+      margin: 0.75rem 0 1rem 0; font-size: 0.8rem; line-height: 1.4;
+    }
+    .ki-override-banner code {
+      background: #fde68a; padding: 0.1rem 0.4rem; border-radius: 0.25rem;
+      font-family: ui-monospace, monospace; font-weight: 700;
+    }
   `],
 })
 export class RoutingDecisionsComponent implements OnInit {
@@ -190,6 +211,10 @@ export class RoutingDecisionsComponent implements OnInit {
   readonly testResult = signal<RoutingTestResult | null>(null);
   testPurpose = '';
 
+  /** v0.12.2: Wenn nicht-null, ist der Cascade-Override im Backend aktiv —
+   *  Banner zeigt das. */
+  readonly overrideCategory = signal<string | null>(null);
+
   /** Konsumenten-i18n-Override. Default = englische Labels. */
   L: RoutingDecisionsLabels = ROUTING_DECISIONS_LABELS_EN;
   set labels(v: Partial<RoutingDecisionsLabels> | undefined) {
@@ -198,6 +223,19 @@ export class RoutingDecisionsComponent implements OnInit {
 
   ngOnInit(): void {
     this.reload();
+    this.loadOverride();
+  }
+
+  /**
+   * v0.12.2: Override-Status laden (Bereich-Toggle aktiv?). Bei Backend
+   * < 0.7.5 wird der Endpoint 404 zurückgeben → wir behandeln das wie
+   * „kein Override aktiv" und der Banner bleibt versteckt.
+   */
+  private loadOverride(): void {
+    this.api.getPreferredCategory().subscribe({
+      next: (resp) => this.overrideCategory.set(resp?.active && resp?.category ? resp.category : null),
+      error: () => this.overrideCategory.set(null),
+    });
   }
 
   reload(): void {
