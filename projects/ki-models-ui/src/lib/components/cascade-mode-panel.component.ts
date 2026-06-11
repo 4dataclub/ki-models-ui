@@ -44,6 +44,17 @@ import { CascadeModePanelLabels, CASCADE_MODE_PANEL_LABELS_EN } from '../models/
       <div *ngIf="categories.length > 0" class="ki-cmp-row">
         <span class="ki-cmp-legend">{{ L.toggleLegend }}</span>
         <div class="ki-cmp-toggle">
+          <!-- v0.14.1: „Auto"-Tab ganz links damit User den Override
+               wieder abwählen kann ohne sich durch Browser-Devtools zu
+               klicken. Aktiv wenn activeCategory leer ist (Semantic
+               Routing). Klick setzt activeCategory = '' (kein Override). -->
+          <button type="button"
+                  (click)="setCategory('')"
+                  class="ki-cmp-tab ki-cmp-tab-off"
+                  [class.ki-cmp-tab-active]="!activeCategory"
+                  [title]="L.hintSemanticRouting">
+            {{ L.offButtonLabel }}
+          </button>
           <button *ngFor="let c of categories"
                   type="button"
                   (click)="setCategory(c)"
@@ -101,6 +112,14 @@ import { CascadeModePanelLabels, CASCADE_MODE_PANEL_LABELS_EN } from '../models/
       background: #0f172a; color: #f8fafc;
     }
     .ki-cmp-tab-active:hover { color: #f8fafc; }
+    /* v0.14.1: „Auto"-Tab visuell etwas subtiler — er ist ein „Off"-
+       Zustand, kein gleichwertiger Bereich. Aktive Variante bekommt
+       eine etwas hellere Background-Farbe damit der User sieht: das
+       ist „kein Override aktiv", nicht „Bereich X aktiv". */
+    .ki-cmp-tab-off { font-style: italic; }
+    .ki-cmp-tab-off.ki-cmp-tab-active {
+      background: #475569; color: #f8fafc;
+    }
     .ki-cmp-hint {
       font-size: 0.7rem; color: #64748b; font-style: italic;
     }

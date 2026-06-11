@@ -355,6 +355,9 @@ export interface CascadeModePanelLabels {
   autoCardSemanticHint: string;
   /** Label am Scroll-Button */
   btnScrollToCascade: string;
+  /** v0.14.1: Label am „Auto/Off"-Tab links vor den Bereich-Buttons.
+   *  Klick darauf setzt activeCategory='' (Semantic Routing aktiv). */
+  offButtonLabel: string;
 }
 
 export const CASCADE_MODE_PANEL_LABELS_EN: CascadeModePanelLabels = {
@@ -364,4 +367,5 @@ export const CASCADE_MODE_PANEL_LABELS_EN: CascadeModePanelLabels = {
   autoCardActiveTemplate: 'Auto-Failover runs via cascade area “{cat}”. See card below for chain + cooldown.',
   autoCardSemanticHint: 'Semantic Routing active — pick a cascade above to override per-call routing.',
   btnScrollToCascade: '↓ Open cascade configuration',
+  offButtonLabel: 'Auto',
 };
