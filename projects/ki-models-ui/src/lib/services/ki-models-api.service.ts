@@ -301,4 +301,18 @@ export class KiModelsApiService {
       `${this.base}/preferred-category`
     );
   }
+
+  /**
+   * v0.13.0 — Setzt den Cascade-Kategorie-Override. Empty-String setzt
+   * zurück auf Semantic Routing.
+   *
+   * Wird vom `<ki-cascade-mode-panel>`-Embed im Konsument-Code
+   * (Switcher/EduPro) im categoryChanged-Handler aufgerufen.
+   */
+  setPreferredCategory(category: string): Observable<{ ok: boolean; category: string }> {
+    return this.http.post<{ ok: boolean; category: string }>(
+      `${this.base}/preferred-category`,
+      { category: category ?? '' }
+    );
+  }
 }

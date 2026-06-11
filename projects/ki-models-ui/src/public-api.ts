@@ -30,3 +30,4 @@ export * from './lib/components/failover-chain.component';
 export * from './lib/components/cascades-view.component';
 export * from './lib/components/routing-decisions.component';
 export * from './lib/components/models-quality-stats.component';
+export * from './lib/components/cascade-mode-panel.component';
