@@ -337,3 +337,31 @@ export const ROUTING_DECISIONS_LABELS_EN: RoutingDecisionsLabels = {
   colActions: 'Actions',
   confirmClearAll: 'Clear the entire routing cache? All future requests will be re-routed.',
 };
+
+/**
+ * v0.13.0 — Labels für `<ki-cascade-mode-panel>`. Bereich-Toggle + Auto-Mode
+ * Info-Card, die jedem Konsument denselben UX bieten soll.
+ */
+export interface CascadeModePanelLabels {
+  /** "Bereich" über dem Toggle */
+  toggleLegend: string;
+  /** Hint wenn kein Override aktiv ist */
+  hintSemanticRouting: string;
+  /** Hint wenn Override aktiv ist, `{cat}` wird durch das Category-Label ersetzt */
+  hintOverrideTemplate: string;
+  /** Info-Text wenn ein Bereich aktiv ist, `{cat}` wird ersetzt */
+  autoCardActiveTemplate: string;
+  /** Info-Text wenn kein Bereich aktiv (Semantic Routing) */
+  autoCardSemanticHint: string;
+  /** Label am Scroll-Button */
+  btnScrollToCascade: string;
+}
+
+export const CASCADE_MODE_PANEL_LABELS_EN: CascadeModePanelLabels = {
+  toggleLegend: 'Cascade',
+  hintSemanticRouting: 'Semantic Routing — Cascade decides per call.',
+  hintOverrideTemplate: 'Override: every generate call goes to “{cat}”.',
+  autoCardActiveTemplate: 'Auto-Failover runs via cascade area “{cat}”. See card below for chain + cooldown.',
+  autoCardSemanticHint: 'Semantic Routing active — pick a cascade above to override per-call routing.',
+  btnScrollToCascade: '↓ Open cascade configuration',
+};
