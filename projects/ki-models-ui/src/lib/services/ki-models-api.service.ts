@@ -9,6 +9,8 @@ import { Cascade } from '../models/cascade';
 import { Category, CategoryUpdate } from '../models/category';
 import { RoutingCache, RoutingTestResult } from '../models/routing';
 import { QualityStatRow } from '../models/quality';
+import { PerformanceRow } from '../models/performance';
+import { CooldownRow } from '../models/cooldown';
 
 /**
  * Library-API-Service. Spricht alle KI-Modell-/API-Key-/Cascade-Endpoints
@@ -314,5 +316,26 @@ export class KiModelsApiService {
       `${this.base}/preferred-category`,
       { category: category ?? '' }
     );
+  }
+
+  // ─── Performance + Cooldown (v0.14.0 — cascade ≥ 0.7.6) ─────────────────
+
+  /**
+   * Performance-Stats pro Modell aus den letzten 30 Tagen.
+   * Wird vom Library-Component {@code <ki-models-performance>} aufgerufen.
+   *
+   * @param sortBy 'calls-desc' (Default) | 'success-desc' | 'chars-desc'
+   */
+  getPerformance(sortBy: 'calls-desc' | 'success-desc' | 'chars-desc' = 'calls-desc'): Observable<PerformanceRow[]> {
+    return this.http.get<PerformanceRow[]>(`${this.base}/stats/performance?sortBy=${sortBy}`);
+  }
+
+  /**
+   * Cooldown + Auto-Disable State pro Modell. Wird vom Library-Component
+   * {@code <ki-models-cooldown-state>} aufgerufen, typischerweise mit
+   * Auto-Refresh alle 30s damit Cooldown-Timer live runterticken.
+   */
+  getCooldownState(): Observable<CooldownRow[]> {
+    return this.http.get<CooldownRow[]>(`${this.base}/cooldown-state`);
   }
 }
