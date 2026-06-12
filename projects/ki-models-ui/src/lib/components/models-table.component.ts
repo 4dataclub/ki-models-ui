@@ -2,6 +2,7 @@ import { Component, EventEmitter, Input, Output, computed, inject, signal } from
 import { CommonModule } from '@angular/common';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { AiModel } from '../models/ai-model';
+import { ProviderServer } from '../models/provider-server';
 import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
 
 /**
@@ -58,6 +59,7 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
                   <th>{{ L.colKey }}</th>
                   <th>{{ L.colEnabled }}</th>
                   <th>{{ L.colStatus }}</th>
+                  <th>{{ L.colServer }}</th>
                   <th class="ki-right">{{ L.colActions }}</th>
                 </tr>
               </thead>
@@ -79,8 +81,8 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
                   <td>
                     <button *ngIf="!m.autoDisabled"
                             (click)="toggle(m)"
-                            [disabled]="!m.enabled && !m.keyConfigured && !isKeylessModel(m)"
-                            [title]="(!m.enabled && !m.keyConfigured && !isKeylessModel(m)) ? L.toggleNeedsKey : ''"
+                            [disabled]="(!m.enabled && !m.keyConfigured && !isKeylessModel(m)) || (!m.enabled && m.hardwareCompatible === false)"
+                            [title]="toggleDisabledReason(m)"
                             class="ki-toggle"
                             [class.ki-toggle-on]="m.enabled"
                             [class.ki-toggle-off]="!m.enabled">
@@ -89,13 +91,17 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
                     <span *ngIf="m.autoDisabled" class="ki-badge ki-badge-error">🚫 {{ L.autoDisabled }}</span>
                   </td>
                   <td>
+                    <span *ngIf="m.hardwareCompatible === false" class="ki-badge ki-badge-warn">⚠ {{ L.hardwareBlocked }}</span>
+                    <span *ngIf="m.hardwareCompatible === false" class="ki-tiny ki-error" [title]="m.hardwareReason || ''">
+                      {{ truncate(m.hardwareReason || '', 60) }}
+                    </span>
                     <span *ngIf="m.autoDisabled" class="ki-tiny ki-error" [title]="m.autoDisabledReason || ''">
                       {{ truncate(m.autoDisabledReason || '', 60) }}
                     </span>
                     <span *ngIf="!m.autoDisabled && (m.cooldownRemainingSec ?? 0) > 0" class="ki-tiny ki-cooldown">
                       cd {{ m.cooldownRemainingSec }}s
                     </span>
-                    <span *ngIf="!m.autoDisabled && !(m.cooldownRemainingSec ?? 0)" class="ki-tiny ki-ok">
+                    <span *ngIf="!m.autoDisabled && !(m.cooldownRemainingSec ?? 0) && m.hardwareCompatible !== false" class="ki-tiny ki-ok">
                       {{ L.free }}
                     </span>
                     <div *ngIf="testResult()[m.id] as r" class="ki-tiny ki-mono"
@@ -105,6 +111,16 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
                       <span *ngIf="r.ok">✓ {{ r.latencyMs }}ms</span>
                       <span *ngIf="!r.ok && !r.pending">✗ {{ truncate(r.error || '', 80) }}</span>
                     </div>
+                  </td>
+                  <td>
+                    <select *ngIf="supportsCustomServer(m); else noServer"
+                            class="ki-server-select"
+                            (change)="setServer(m, $any($event.target).value)">
+                      <option value="" [selected]="!m.providerServerName">{{ L.serverDefault }}</option>
+                      <option *ngFor="let s of providerServers()" [value]="s.name"
+                              [selected]="m.providerServerName === s.name">{{ s.name }}</option>
+                    </select>
+                    <ng-template #noServer><span class="ki-muted ki-tiny">—</span></ng-template>
                   </td>
                   <td class="ki-right ki-actions">
                     <button (click)="moveInCategory(cat, i, -1)"
@@ -178,6 +194,7 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
     .ki-badge-ok { background: #d1fae5; color: #065f46; }
     .ki-badge-warn { background: #fee2e2; color: #991b1b; }
     .ki-badge-local { background: #dbeafe; color: #1e40af; }
+    .ki-server-select { font-size: 0.75rem; padding: 0.1rem 0.25rem; border-radius: 0.25rem; border: 1px solid #cbd5e1; background: #fff; max-width: 9rem; }
     .ki-badge-error { background: #ef4444; color: white; }
     .ki-toggle {
       padding: 0.25rem 0.6rem;
@@ -296,6 +313,9 @@ export class ModelsTableComponent {
   readonly loading = signal(true);
   readonly models = signal<AiModel[]>([]);
   readonly testResult = signal<Record<number, { ok?: boolean; latencyMs?: number; error?: string; pending?: boolean; skipped?: boolean }>>({});
+  /** v0.15.0 — benannte Inferenz-Server für das pro-Modell-Dropdown. Leer wenn
+   *  Backend < 0.8.0 (Endpoint 404) → Dropdown zeigt nur „Default". */
+  readonly providerServers = signal<ProviderServer[]>([]);
 
   /**
    * Modelle gruppiert nach Kategorie. null/undefined/leer → `'general'`
@@ -373,6 +393,7 @@ export class ModelsTableComponent {
 
   ngOnInit(): void {
     this.reload();
+    this.loadProviderServers();
   }
 
   reload(): void {
@@ -386,10 +407,44 @@ export class ModelsTableComponent {
     });
   }
 
+  /** v0.15.0 — lädt die benannten Server fürs Server-Dropdown. Backend < 0.8.0
+   *  liefert 404 → leere Liste, Dropdown zeigt nur „Default". */
+  private loadProviderServers(): void {
+    this.api.listProviderServers().subscribe({
+      next: (list) => this.providerServers.set(list ?? []),
+      error: () => this.providerServers.set([]),
+    });
+  }
+
+  /** v0.15.0 — Server-Auswahl nur für lokale/self-hosted Provider sinnvoll.
+   *  Cloud-Provider haben feste Endpoints und ignorieren den Server. */
+  supportsCustomServer(m: AiModel): boolean {
+    return m.provider === 'ollama' || m.provider === 'openai_compat';
+  }
+
+  /** v0.15.0 — weist einem Modell einen Inferenz-Server zu (leer = Default). */
+  setServer(m: AiModel, name: string): void {
+    this.api.updateModel(m.id, { providerServerName: name || null } as any).subscribe(() => {
+      this.modelChanged.emit(m);
+      this.reload();
+    });
+  }
+
+  /** Tooltip für den (ggf. deaktivierten) Enable-Toggle: Key-Grund vs. Hardware-Grund. */
+  toggleDisabledReason(m: AiModel): string {
+    if (!m.enabled && m.hardwareCompatible === false) return this.L.toggleHardwareBlocked;
+    if (!m.enabled && !m.keyConfigured && !this.isKeylessModel(m)) return this.L.toggleNeedsKey;
+    return '';
+  }
+
   toggle(m: AiModel): void {
     // v0.11.3 — keyless Modelle (Ollama, oder Konsument-Override für anthropic
     // via Max-OAuth) duerfen auch ohne keyConfigured aktiviert werden.
     if (!m.enabled && !m.keyConfigured && !this.isKeylessModel(m)) return;
+    // v0.15.0 — hardware-geblockte Modelle nicht aktivierbar (nur OFF→ON sperren;
+    // ein bereits aktives Modell bleibt abschaltbar). Geht von selbst wieder auf
+    // sobald das Backend hardwareCompatible=true liefert (mehr RAM / ext. Server).
+    if (!m.enabled && m.hardwareCompatible === false) return;
     this.api.toggleModel(m.id, !m.enabled).subscribe(() => {
       this.modelChanged.emit(m);
       this.reload();

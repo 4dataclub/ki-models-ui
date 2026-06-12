@@ -42,6 +42,14 @@ export interface ModelsTableLabels {
   categoryUtilityHint: string;
   categoryContentHint: string;
   categoryGeneralHint: string;
+  /** v0.15.0 — Spaltenkopf für den Inferenz-Server pro Modell. */
+  colServer: string;
+  /** v0.15.0 — Dropdown-Option/Anzeige für den Default-Server (localhost). */
+  serverDefault: string;
+  /** v0.15.0 — Badge wenn die Server-Hardware nicht reicht (hardwareCompatible=false). */
+  hardwareBlocked: string;
+  /** v0.15.0 — Toggle-Tooltip wenn das Aktivieren wegen Hardware gesperrt ist. */
+  toggleHardwareBlocked: string;
   confirmDelete: (modelId: string) => string;
 }
 
@@ -76,6 +84,10 @@ export const MODELS_TABLE_LABELS_EN: ModelsTableLabels = {
   categoryUtilityHint: 'Translations, audits, verifier — cheap/free models preferred.',
   categoryContentHint: 'Lesson content, exams, chat — quality matters.',
   categoryGeneralHint: 'Used in both cascades when category-specific models are exhausted.',
+  colServer: 'Server',
+  serverDefault: 'Default (localhost)',
+  hardwareBlocked: 'Hardware insufficient',
+  toggleHardwareBlocked: 'Server hardware insufficient — add RAM, use an external server, or pick a smaller model',
   confirmDelete: (id) => `Delete model "${id}"?`,
 };
 
@@ -86,6 +98,10 @@ export interface AddModelFormLabels {
   fieldDisplayName: string;
   fieldCategory: string;
   fieldCooldownOverride: string;
+  /** v0.15.0 — Label für das Inferenz-Server-Dropdown (optional, Default localhost). */
+  fieldProviderServer: string;
+  /** v0.15.0 — Option „Default (localhost)" im Server-Dropdown. */
+  providerServerDefault: string;
   btnAdd: string;
   btnAdding: string;
   hint: string;
@@ -109,6 +125,8 @@ export const ADD_MODEL_FORM_LABELS_EN: AddModelFormLabels = {
   fieldDisplayName: 'Display Name (optional)',
   fieldCategory: 'Category',
   fieldCooldownOverride: 'Cooldown 503 override (sec, optional)',
+  fieldProviderServer: 'Inference server (optional)',
+  providerServerDefault: 'Default (localhost)',
   btnAdd: 'Add Model',
   btnAdding: 'Adding…',
   hint: 'The API key setting holds the actual key value — it lives in the API-Keys section below. Multiple models may share the same setting key. Category routes the request: utility for translations/audits, content for lessons/exams, general for both.',
@@ -368,4 +386,60 @@ export const CASCADE_MODE_PANEL_LABELS_EN: CascadeModePanelLabels = {
   autoCardSemanticHint: 'Semantic Routing active — pick a cascade above to override per-call routing.',
   btnScrollToCascade: '↓ Open cascade configuration',
   offButtonLabel: 'Auto',
+};
+
+/**
+ * v0.15.0 — Labels für `<ki-provider-servers>` (Verwaltung externer
+ * Inferenz-Server). Konsument überschreibt via [labels]-Input; Defaults englisch.
+ */
+export interface ProviderServersLabels {
+  title: string;
+  subtitle: string;
+  colName: string;
+  colBaseUrl: string;
+  colDefault: string;
+  colActions: string;
+  badgeDefault: string;
+  btnAdd: string;
+  btnEdit: string;
+  btnDelete: string;
+  btnSave: string;
+  btnCancel: string;
+  btnSetDefault: string;
+  fieldName: string;
+  fieldBaseUrl: string;
+  fieldDescription: string;
+  empty: string;
+  loading: string;
+  hint: string;
+  errorNameFormat: string;
+  errorBaseUrlRequired: string;
+  errorDeleteDefault: string;
+  confirmDelete: (name: string) => string;
+}
+
+export const PROVIDER_SERVERS_LABELS_EN: ProviderServersLabels = {
+  title: 'Inference Servers',
+  subtitle: 'Named servers for local models (Ollama). A model can run its inference on an external machine; the default is localhost.',
+  colName: 'Name',
+  colBaseUrl: 'Base URL',
+  colDefault: 'Default',
+  colActions: 'Actions',
+  badgeDefault: 'DEFAULT',
+  btnAdd: 'Add server',
+  btnEdit: 'Edit',
+  btnDelete: 'Delete',
+  btnSave: 'Save',
+  btnCancel: 'Cancel',
+  btnSetDefault: 'Set default',
+  fieldName: 'Name (e.g. gpu-box) — [a-z0-9_-]',
+  fieldBaseUrl: 'Base URL (incl. /v1, e.g. http://gpu-box:11434/v1)',
+  fieldDescription: 'Description (optional)',
+  empty: 'No servers yet. The default "localhost" is seeded by the backend on first start.',
+  loading: 'Loading servers…',
+  hint: 'Only relevant for local providers (Ollama). Cloud providers (Gemini, OpenRouter…) have fixed endpoints and ignore this. The default server cannot be deleted.',
+  errorNameFormat: 'Name must match [a-z0-9_-]{1,50}',
+  errorBaseUrlRequired: 'Base URL is required',
+  errorDeleteDefault: 'The default server cannot be deleted. Set another as default first.',
+  confirmDelete: (name) => `Delete server "${name}"?`,
 };

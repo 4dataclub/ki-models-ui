@@ -366,7 +366,7 @@ einen ausgewählten Provider                         cloud: "Premium, voller Coo
 
 ---
 
-## Hardware-Safety (v0.7.0 — geplant)
+## Hardware-Safety (umgesetzt — v0.15.0)
 
 **Anforderung:** Die Library darf keine Modelle als „aktivierbar" anbieten,
 wenn die Server-Hardware nicht reicht. Sonst killt ein zu großes Ollama-
@@ -382,14 +382,41 @@ interface AiModel {
 }
 ```
 
-**Library-Verhalten:**
-- `<ki-models-table>` zeigt für `hardwareCompatible=false` ein rotes Badge
-  „Hardware unzureichend" + Tooltip mit `hardwareReason`
-- Toggle-Button ist disabled (Modell kann nicht enabled werden)
-- `<ki-add-model-form>` zeigt beim Submit eine Warnung wenn das gewählte
-  Modell zu groß ist — User muss bewusst bestätigen oder andere Größe wählen
+**Library-Verhalten (`<ki-models-table>`, seit v0.15.0):**
+- Bei `hardwareCompatible=false` ein rotes Badge „⚠ Hardware unzureichend" +
+  der `hardwareReason`-Text **direkt sichtbar** (gekürzt, voller Text per Hover)
+  — man erkennt sofort warum.
+- Enable-Toggle ist **disabled** (nur OFF→ON gesperrt; ein bereits aktives
+  Modell bleibt abschaltbar). Tooltip erklärt den Grund.
+- **Dynamisch:** die Sperre hängt am Live-Feld `hardwareCompatible`, das das
+  Backend bei jedem `GET /ai-models` neu berechnet. Sobald die Hardware reicht
+  (mehr RAM, **externer Server** zugewiesen, kleineres Modell) → nach ↻ Reload
+  ist der Toggle automatisch wieder offen.
 
-→ **Der User kann den Server NICHT versehentlich lahmlegen.**
+→ **Der User kann den Server NICHT versehentlich lahmlegen** — sieht aber
+warum und wie er's lösen kann.
+
+---
+
+## Inferenz-Server pro Modell (v0.15.0)
+
+Lokale Modelle (Ollama) laufen normalerweise auf „localhost". Über benannte
+**Inferenz-Server** kann ein Modell seine Berechnung an einen externen Rechner
+(z.B. eine GPU-Maschine) auslagern — Default bleibt localhost. Cloud-Provider
+(Gemini, OpenRouter…) sind nicht betroffen (feste Endpoints).
+
+- **`<ki-provider-servers>`** — eigene Komponente: Server anlegen/ändern/löschen,
+  einen als Default markieren (Default nicht löschbar).
+- **`<ki-add-model-form>`** + **`<ki-models-table>`** — Dropdown „Inferenz-Server"
+  pro Modell (nur für `ollama`/`openai_compat`; Cloud zeigt „—").
+- Backend: `ProviderServerResolver` (llm-cascade ≥ 0.8.0) löst die effektive
+  Server-URL auf und routet den echten Call dorthin.
+
+```
+GET    {base}/provider-servers           → ProviderServer[]
+PUT    {base}/provider-servers/{name}     → { ok }   { baseUrl, isDefault?, description? }
+DELETE {base}/provider-servers/{name}     → { ok }   (Default nicht löschbar)
+```
 
 ---
 
@@ -412,6 +439,16 @@ Tier 1+ MUSS Cloud sein. Für „echtes lokal-only" → 16+ GB VRAM-Hardware.
 Die Library schreibt das aber nicht vor — wer Firma-Hardware hat, kann
 auch `qwen3-coder:30b` oder `gemma4:24b` in `utility` packen. Die
 Vorschlagsliste im Add-Form (v0.11.5) deckt beides ab.
+
+---
+
+## Cooldown-Live-Anzeige (v0.15.0)
+
+`<ki-models-cooldown-state>` und `<ki-cascades-view>` zeigen den Cooldown-Zähler
+jetzt **live**: ein lokaler 1-Sekunden-Tick rechnet die Backend-Restzeit sichtbar
+runter (kein zusätzlicher API-Traffic), und `<ki-cascades-view>` pollt zusätzlich
+alle `autoRefreshSec` (Default 30s) neu. Vorher fror der Wert zwischen den Reloads
+ein bzw. lud nur einmal — der Status „aktualisierte sich nicht".
 
 ---
 

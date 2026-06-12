@@ -114,9 +114,18 @@ export interface AiModel {
 
   /**
    * v0.7.1 — Provider-Server-Name (z.B. „localhost" oder „gpu-firma").
-   * llm-cascade resolved das zu einer Base-URL. Wenn null: Default-Server.
+   * llm-cascade resolved das zu einer Base-URL (`ProviderServerResolver`,
+   * cascade ≥ 0.8.0). Wenn null: Default-Server „localhost" (nur für Ollama).
+   * Im UI als Dropdown editierbar (`<ki-provider-servers>` verwaltet die Liste).
    */
   providerServerName?: string | null;
+
+  /**
+   * v0.7.0 — Direkte Base-URL-Override (legacy, vor benannten Servern).
+   * `providerServerName` hat Vorrang. Wird vom Backend in `GET /ai-models`
+   * mitgeliefert; selten direkt im UI gesetzt.
+   */
+  providerBaseUrl?: string | null;
 
   /**
    * v0.7.1 — Quality-Info aus llm_call_log der letzten 30 Tage.
@@ -138,6 +147,8 @@ export interface AiModelCreate {
   enabled?: boolean;
   orderIdx?: number;
   cooldown503OverrideSec?: number | null;
+  /** v0.15.0 — optionaler Inferenz-Server (benannt). Leer = Default „localhost". */
+  providerServerName?: string | null;
 }
 
 /** Body für `PUT /ai-models/{id}` — Update (Partial). */

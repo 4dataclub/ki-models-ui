@@ -11,6 +11,7 @@ import { RoutingCache, RoutingTestResult } from '../models/routing';
 import { QualityStatRow } from '../models/quality';
 import { PerformanceRow } from '../models/performance';
 import { CooldownRow } from '../models/cooldown';
+import { ProviderServer, ProviderServerUpsert } from '../models/provider-server';
 
 /**
  * Library-API-Service. Spricht alle KI-Modell-/API-Key-/Cascade-Endpoints
@@ -337,5 +338,31 @@ export class KiModelsApiService {
    */
   getCooldownState(): Observable<CooldownRow[]> {
     return this.http.get<CooldownRow[]>(`${this.base}/cooldown-state`);
+  }
+
+  // ─── Provider-Server (v0.15.0 — externe Inferenz-Server, cascade ≥ 0.8.0) ──
+
+  /**
+   * Liste der benannten Inferenz-Server. Bei Backend < 0.8.0 (Endpoint nicht
+   * vorhanden) liefert der Konsument 404 → die Component fängt das und zeigt
+   * einen leeren Zustand (Feature degradiert sauber).
+   */
+  listProviderServers(): Observable<ProviderServer[]> {
+    return this.http.get<ProviderServer[]>(`${this.base}/provider-servers`);
+  }
+
+  /** Upsert eines Servers (anlegen/ändern). Setzt {@code isDefault} ggf. exklusiv. */
+  upsertProviderServer(name: string, body: ProviderServerUpsert): Observable<{ ok: boolean }> {
+    return this.http.put<{ ok: boolean }>(
+      `${this.base}/provider-servers/${encodeURIComponent(name)}`,
+      body,
+    );
+  }
+
+  /** Löscht einen Server. Der Default-Server kann nicht gelöscht werden (Backend 400). */
+  deleteProviderServer(name: string): Observable<{ ok: boolean }> {
+    return this.http.delete<{ ok: boolean }>(
+      `${this.base}/provider-servers/${encodeURIComponent(name)}`,
+    );
   }
 }

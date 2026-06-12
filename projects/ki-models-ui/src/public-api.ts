@@ -17,6 +17,7 @@ export * from './lib/models/routing';
 export * from './lib/models/quality';
 export * from './lib/models/performance';
 export * from './lib/models/cooldown';
+export * from './lib/models/provider-server';
 export * from './lib/models/labels';
 
 // ─── Service + InjectionToken ────────────────────────────────────────────
@@ -35,3 +36,4 @@ export * from './lib/components/models-quality-stats.component';
 export * from './lib/components/cascade-mode-panel.component';
 export * from './lib/components/models-performance.component';
 export * from './lib/components/models-cooldown-state.component';
+export * from './lib/components/provider-servers.component';

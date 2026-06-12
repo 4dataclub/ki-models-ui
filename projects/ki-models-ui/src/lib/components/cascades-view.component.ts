@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -176,7 +176,7 @@ import {
   `,
   styles: [],
 })
-export class CascadesViewComponent implements OnInit {
+export class CascadesViewComponent implements OnInit, OnDestroy {
   @Input() set labels(v: Partial<CascadesViewLabels> | undefined) {
     this.L = { ...CASCADES_VIEW_LABELS_EN, ...(v ?? {}) };
   }
@@ -275,8 +275,28 @@ export class CascadesViewComponent implements OnInit {
       }));
   });
 
+  /** v0.15.0 — Auto-Refresh (Sekunden, 0 = aus) + 1s-Live-Tick. Vorher lud die
+   *  View nur einmal in ngOnInit → die Cooldown-Zähler froren ein. */
+  @Input() autoRefreshSec = 30;
+  readonly tick = signal(Date.now());
+  private fetchedAt = Date.now();
+  private refreshTimer: ReturnType<typeof setInterval> | null = null;
+  private tickTimer: ReturnType<typeof setInterval> | null = null;
+
   ngOnInit(): void {
     this.reload();
+    if (this.autoRefreshSec > 0) {
+      this.refreshTimer = setInterval(() => this.reload(), this.autoRefreshSec * 1000);
+    }
+    // Sekunden-Tick für die Live-Anzeige — rein lokal, kein API-Traffic.
+    this.tickTimer = setInterval(() => this.tick.set(Date.now()), 1000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.refreshTimer) clearInterval(this.refreshTimer);
+    if (this.tickTimer) clearInterval(this.tickTimer);
+    this.refreshTimer = null;
+    this.tickTimer = null;
   }
 
   reload(): void {
