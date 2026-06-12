@@ -48,7 +48,7 @@ import { CooldownRow } from '../models/cooldown';
         <tbody>
           <tr *ngFor="let r of rows()"
               [class.ki-row-killed]="r.autoDisabled"
-              [class.ki-row-cooldown]="!r.autoDisabled && r.cooldownRemainingSec > 0">
+              [class.ki-row-cooldown]="!r.autoDisabled && liveRemaining(r) > 0">
             <td class="ki-icon">
               {{ statusIcon(r) }}
             </td>
@@ -60,13 +60,13 @@ import { CooldownRow } from '../models/cooldown';
             <td class="ki-tiny">{{ r.category || '—' }}</td>
             <td class="ki-right ki-mono">
               <span *ngIf="r.autoDisabled" class="ki-status-killed">KILLED</span>
-              <span *ngIf="!r.autoDisabled && r.cooldownRemainingSec > 0" class="ki-status-cooldown">
-                {{ formatCooldown(r.cooldownRemainingSec) }}
+              <span *ngIf="!r.autoDisabled && liveRemaining(r) > 0" class="ki-status-cooldown">
+                {{ formatCooldown(liveRemaining(r)) }}
               </span>
-              <span *ngIf="!r.autoDisabled && r.cooldownRemainingSec === 0 && r.enabled" class="ki-status-ok">
+              <span *ngIf="!r.autoDisabled && liveRemaining(r) === 0 && r.enabled" class="ki-status-ok">
                 ready
               </span>
-              <span *ngIf="!r.autoDisabled && r.cooldownRemainingSec === 0 && !r.enabled" class="ki-status-off">
+              <span *ngIf="!r.autoDisabled && liveRemaining(r) === 0 && !r.enabled" class="ki-status-off">
                 off
               </span>
             </td>
@@ -140,18 +140,28 @@ export class ModelsCooldownStateComponent implements OnInit, OnDestroy {
   readonly rows = signal<CooldownRow[]>([]);
   readonly loading = signal(true);
 
+  /** v0.15.0 — 1s-Tick, lässt den Cooldown-Zähler zwischen den Reloads sichtbar
+   *  runterlaufen. `fetchedAt` = Zeitpunkt des letzten Backend-Werts. */
+  readonly tick = signal(Date.now());
+  private fetchedAt = Date.now();
+
   private timer: ReturnType<typeof setInterval> | null = null;
+  private tickTimer: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void {
     this.reload();
     if (this.autoRefreshSec > 0) {
       this.timer = setInterval(() => this.reload(), this.autoRefreshSec * 1000);
     }
+    // Sekunden-Tick für die Live-Anzeige — rein lokal, kein API-Traffic.
+    this.tickTimer = setInterval(() => this.tick.set(Date.now()), 1000);
   }
 
   ngOnDestroy(): void {
     if (this.timer) clearInterval(this.timer);
+    if (this.tickTimer) clearInterval(this.tickTimer);
     this.timer = null;
+    this.tickTimer = null;
   }
 
   reload(): void {
@@ -159,6 +169,8 @@ export class ModelsCooldownStateComponent implements OnInit, OnDestroy {
     this.api.getCooldownState().subscribe({
       next: (rows) => {
         this.rows.set(Array.isArray(rows) ? rows : []);
+        this.fetchedAt = Date.now();
+        this.tick.set(this.fetchedAt);
         this.loading.set(false);
       },
       error: () => {
@@ -168,9 +180,18 @@ export class ModelsCooldownStateComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * v0.15.0 — Live-Restzeit: Backend-Wert minus seither vergangene Sekunden.
+   * Liest {@link tick}, damit die Anzeige jede Sekunde neu berechnet wird.
+   */
+  liveRemaining(r: CooldownRow): number {
+    const elapsed = Math.floor((this.tick() - this.fetchedAt) / 1000);
+    return Math.max(0, (r.cooldownRemainingSec ?? 0) - elapsed);
+  }
+
   statusIcon(r: CooldownRow): string {
     if (r.autoDisabled) return '✗';
-    if (r.cooldownRemainingSec > 0) return '⏳';
+    if (this.liveRemaining(r) > 0) return '⏳';
     if (!r.enabled) return '○';
     return '✓';
   }

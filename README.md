@@ -442,6 +442,16 @@ Vorschlagsliste im Add-Form (v0.11.5) deckt beides ab.
 
 ---
 
+## Cooldown-Live-Anzeige (v0.15.0)
+
+`<ki-models-cooldown-state>` und `<ki-cascades-view>` zeigen den Cooldown-Zähler
+jetzt **live**: ein lokaler 1-Sekunden-Tick rechnet die Backend-Restzeit sichtbar
+runter (kein zusätzlicher API-Traffic), und `<ki-cascades-view>` pollt zusätzlich
+alle `autoRefreshSec` (Default 30s) neu. Vorher fror der Wert zwischen den Reloads
+ein bzw. lud nur einmal — der Status „aktualisierte sich nicht".
+
+---
+
 ## Backend-Vertrag
 
 Konsumenten-Backend muss folgende Endpoints unter der konfigurierten Base
