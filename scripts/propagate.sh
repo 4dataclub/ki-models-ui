@@ -12,7 +12,7 @@
 #       - package.json + package-lock.json updaten
 #       - commit + push
 #       - PR erstellen + mergen (optional --no-merge zum Stop nach PR)
-#       - Branch via scripts/archive-branch.sh archivieren (wenn vorhanden)
+#       - gemergten Branch loeschen (neue Regel: kein historie-Archiv mehr)
 #
 #  Voraussetzungen:
 #    - cwd: ki-models-ui Repo-Root
@@ -162,13 +162,15 @@ Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
     gh pr merge --merge "$PR_URL" >/dev/null 2>&1 || gh pr merge --merge >/dev/null 2>&1 || true
   fi
 
-  # Branch archivieren (sofern Skript da ist)
-  if [ -x "$CONSUMER_ROOT/scripts/archive-branch.sh" ]; then
+  # Gemergten Branch loeschen (neue Regel 2026-06-11: kein historie-Archiv mehr,
+  # Cluster werden stattdessen per milestone-Tag markiert).
+  if [ "$MERGE" = true ]; then
     sleep 1  # GitHub etwas Zeit damit den merge sieht
     git checkout main >/dev/null 2>&1
     git pull --rebase --quiet
-    echo "    → archive-branch.sh $BRANCH"
-    bash "$CONSUMER_ROOT/scripts/archive-branch.sh" "$BRANCH" 2>&1 | tail -1 || true
+    echo "    → loesche gemergten Branch $BRANCH (remote + lokal)"
+    git push origin --delete "$BRANCH" >/dev/null 2>&1 || true
+    git branch -D "$BRANCH" >/dev/null 2>&1 || true
   fi
 done
 
