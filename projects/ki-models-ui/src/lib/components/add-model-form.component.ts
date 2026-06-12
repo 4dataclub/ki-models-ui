@@ -5,6 +5,7 @@ import { KiModelsApiService } from '../services/ki-models-api.service';
 import { AiModel, AiModelCreate } from '../models/ai-model';
 import { ApiKeySetting } from '../models/api-key-setting';
 import { Category } from '../models/category';
+import { ProviderServer } from '../models/provider-server';
 import { AddModelFormLabels, ADD_MODEL_FORM_LABELS_EN } from '../models/labels';
 
 /**
@@ -86,6 +87,17 @@ import { AddModelFormLabels, ADD_MODEL_FORM_LABELS_EN } from '../models/labels';
                [placeholder]="L.fieldCooldownOverride"
                class="ki-input" />
 
+        <!-- v0.15.0 — Inferenz-Server nur für lokale/self-hosted Provider
+             (Ollama / openai_compat). Cloud-Provider haben feste Endpoints. -->
+        <select *ngIf="provider === 'ollama' || provider === 'openai_compat'"
+                [(ngModel)]="providerServerName"
+                name="providerServerName"
+                class="ki-input ki-mono"
+                [attr.aria-label]="L.fieldProviderServer">
+          <option value="">{{ L.providerServerDefault }}</option>
+          <option *ngFor="let s of providerServers()" [value]="s.name">{{ s.name }}</option>
+        </select>
+
         <button type="submit"
                 [disabled]="submitting() || !provider || !modelId || !apiKeySettingKey"
                 class="ki-btn-primary">
@@ -159,10 +171,14 @@ export class AddModelFormComponent {
    */
   category: string = 'content';
   cooldown503OverrideSec: number | null = null;
+  /** v0.15.0 — gewählter Inferenz-Server (leer = Default „localhost"). */
+  providerServerName = '';
 
   readonly submitting = signal(false);
   readonly error = signal<string | null>(null);
   readonly keys = signal<ApiKeySetting[]>([]);
+  /** v0.15.0 — benannte Server fürs Dropdown (leer wenn Backend < 0.8.0). */
+  readonly providerServers = signal<ProviderServer[]>([]);
 
   /**
    * Kategorien aus dem Backend (v0.10.0 — `GET {base}/categories`). Wird im
@@ -280,6 +296,10 @@ export class AddModelFormComponent {
       next: (list) => this.keys.set(list),
       error: () => this.keys.set([]),
     });
+    this.api.listProviderServers().subscribe({
+      next: (list) => this.providerServers.set(list ?? []),
+      error: () => this.providerServers.set([]),
+    });
     this.api.listCategories().subscribe({
       next: (list) => {
         this.categoriesFromBackend.set(Array.isArray(list) ? list : []);
@@ -374,6 +394,7 @@ export class AddModelFormComponent {
       displayName: this.displayName?.trim() || undefined,
       category: this.category,
       cooldown503OverrideSec: this.cooldown503OverrideSec,
+      providerServerName: this.providerServerName || undefined,
     };
     this.api.createModel(body).subscribe({
       next: (created) => {
@@ -381,6 +402,7 @@ export class AddModelFormComponent {
         this.modelId = '';
         this.displayName = '';
         this.cooldown503OverrideSec = null;
+        this.providerServerName = '';
         this.submitting.set(false);
       },
       error: (err) => {
