@@ -1,7 +1,7 @@
 import { Component, EventEmitter, Input, Output, OnInit, OnDestroy, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, forkJoin } from 'rxjs';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { AiModel } from '../models/ai-model';
 import { Cascade } from '../models/cascade';
@@ -264,10 +264,16 @@ export class CascadesViewComponent implements OnInit, OnDestroy {
     return result;
   });
 
-  /** Provider-Modell-Dropdown-Optionen, ebenfalls als computed (stable ref). */
+  /**
+   * Provider-Modell-Dropdown-Optionen (stable ref). Zeigt ALLE konfigurierten
+   * Modelle an — auch deaktivierte (AUS) — damit die Cascade-Bereiche die eine
+   * Verwaltungsfläche sind: genau die Modelle aus der Tabelle sind hier wählbar.
+   * Nur autoDisabled (tot/wiederholt fehlgeschlagen) bleibt raus. Ein im Chain
+   * gewähltes Modell wird in {@link #onChainChanged} automatisch aktiviert.
+   */
   readonly availableModelsAll = computed<{ provider: string; modelId: string; displayName: string }[]>(() => {
     return this.allModels()
-      .filter(m => m.enabled && !m.autoDisabled)
+      .filter(m => !m.autoDisabled)
       .map(m => ({
         provider: m.provider,
         modelId: m.modelId,
@@ -510,6 +516,16 @@ export class CascadesViewComponent implements OnInit, OnDestroy {
       }
     }
 
+    // Cascade = Verwaltungsfläche: ins Chain gewählte Modelle werden AKTIVIERT,
+    // kategorie-eigene Modelle die aus dem Chain entfernt wurden DEAKTIVIERT.
+    // general-Modelle sind geteilt (in jeder Kategorie angehängt) → beim Editieren
+    // einer anderen Kategorie NICHT anfassen: nur Modelle deren category == cascadeName.
+    const cat = cascadeName.toLowerCase();
+    const toEnable  = global.filter(m => idsInChain.has(m.id) && !m.enabled);
+    const toDisable = global.filter(m =>
+      !idsInChain.has(m.id) && m.enabled
+      && ((m.category ?? 'general').toLowerCase() === cat));
+
     // Globale Liste neu komponieren: bei den cascade-Slots in der globalen
     // Reihenfolge die neue cascade-Order einsetzen, fremde Modelle behalten
     // ihre Position.
@@ -523,12 +539,27 @@ export class CascadesViewComponent implements OnInit, OnDestroy {
       }
     }
 
-    this.api.reorderModels(newGlobalOrder).subscribe({
+    const applyReorder = () => this.api.reorderModels(newGlobalOrder).subscribe({
       next: () => {
         this.cascadeChanged.emit({ cascadeName, chain: newChain });
         this.reload();
       },
       error: (e) => console.error('[ki-cascades-view] reorder failed', e),
     });
+
+    // Erst Enable/Disable (falls nötig), dann Reorder + Reload. Ohne Änderungen
+    // direkt reordern.
+    const ops = [
+      ...toEnable.map(m => this.api.toggleModel(m.id, true)),
+      ...toDisable.map(m => this.api.toggleModel(m.id, false)),
+    ];
+    if (ops.length === 0) {
+      applyReorder();
+    } else {
+      forkJoin(ops).subscribe({
+        next:  () => applyReorder(),
+        error: (e) => { console.error('[ki-cascades-view] enable/disable failed', e); applyReorder(); },
+      });
+    }
   }
 }
