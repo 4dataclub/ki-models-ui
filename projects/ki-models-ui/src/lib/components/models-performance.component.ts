@@ -1,8 +1,10 @@
-import { Component, Input, OnInit, inject, signal } from '@angular/core';
+import { Component, Input, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { PerformanceRow } from '../models/performance';
+import { KiPagerComponent, paginate } from './ki-pager.component';
+import { SortState, nextSort, sortGlyph, sortRows, filterRows } from './table-tools';
 
 /**
  * v0.14.0 — Performance-Tabelle pro Modell der letzten 30 Tage.
@@ -29,7 +31,7 @@ import { PerformanceRow } from '../models/performance';
 @Component({
   selector: 'ki-models-performance',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, KiPagerComponent],
   template: `
     <div class="ki-perf">
       <div class="ki-header">
@@ -53,18 +55,22 @@ import { PerformanceRow } from '../models/performance';
         Keine Calls in den letzten 30 Tagen.
       </p>
 
+      <input *ngIf="rows().length > 0"
+        class="ki-filter" type="text" placeholder="Filtern…"
+        [value]="filter()" (input)="setFilter($any($event.target).value)" />
+
       <table *ngIf="rows().length > 0" class="ki-table">
         <thead>
           <tr>
-            <th>Modell</th>
-            <th class="ki-right">Calls</th>
-            <th class="ki-right">Erfolg</th>
-            <th class="ki-right">Ø Chars</th>
+            <th class="ki-sortable" (click)="sortCol('model')">Modell <span class="ki-glyph">{{ glyph('model') }}</span></th>
+            <th class="ki-right ki-sortable" (click)="sortCol('calls')">Calls <span class="ki-glyph">{{ glyph('calls') }}</span></th>
+            <th class="ki-right ki-sortable" (click)="sortCol('successRate')">Erfolg <span class="ki-glyph">{{ glyph('successRate') }}</span></th>
+            <th class="ki-right ki-sortable" (click)="sortCol('avgChars')">Ø Chars <span class="ki-glyph">{{ glyph('avgChars') }}</span></th>
             <th *ngIf="hasCost" class="ki-right">Cost (30d)</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let r of rows()">
+          <tr *ngFor="let r of pageRows()">
             <td class="ki-mono">
               <span class="ki-provider">{{ r.provider }}</span>
               <strong>{{ r.model }}</strong>
@@ -82,6 +88,13 @@ import { PerformanceRow } from '../models/performance';
           </tr>
         </tbody>
       </table>
+
+      <ki-pager
+        [total]="viewRows().length"
+        [page]="page()"
+        [pageSize]="pageSize"
+        (pageChange)="page.set($event)">
+      </ki-pager>
 
       <p *ngIf="hasCost" class="ki-cost-note">
         Cost geschätzt aus output_chars × {{ costNote }}.
@@ -109,12 +122,20 @@ import { PerformanceRow } from '../models/performance';
       padding: 0.35rem 0.6rem; background: #e0e7ff; color: #3730a3;
       border: none; border-radius: 0.375rem; font-size: 0.8rem; cursor: pointer;
     }
+    .ki-filter {
+      width: 100%; box-sizing: border-box; padding: 0.4rem 0.6rem;
+      margin-bottom: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.375rem;
+      font-size: 0.8rem;
+    }
     .ki-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .ki-table thead tr { border-bottom: 2px solid #e2e8f0; }
     .ki-table th {
       padding: 0.5rem 0.6rem; text-align: left; text-transform: uppercase;
       font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; color: #64748b;
     }
+    .ki-sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    .ki-sortable:hover { color: #4f46e5; }
+    .ki-glyph { font-size: 0.6rem; opacity: 0.6; }
     .ki-table td { padding: 0.55rem 0.6rem; border-bottom: 1px solid #f1f5f9; }
     .ki-right { text-align: right; }
     .ki-mono { font-family: ui-monospace, monospace; }
@@ -153,9 +174,23 @@ export class ModelsPerformanceComponent implements OnInit {
   /** USD → EUR Konvertierungs-Faktor (Default Stand 2026). */
   @Input() usdToEur: number = 0.92;
 
+  /** Seitengröße der Tabelle. Pager nur sichtbar wenn mehr Zeilen. */
+  @Input() pageSize = 10;
+
   sortBy: 'calls-desc' | 'success-desc' | 'chars-desc' = 'calls-desc';
   readonly rows = signal<PerformanceRow[]>([]);
   readonly loading = signal(true);
+  readonly page = signal(0);
+  readonly filter = signal('');
+  readonly sort = signal<SortState>({ key: null, dir: null });
+  readonly viewRows = computed(() =>
+    sortRows(filterRows(this.rows(), this.filter(), ['provider', 'model']), this.sort()),
+  );
+  readonly pageRows = computed(() => paginate(this.viewRows(), this.page(), this.pageSize));
+
+  glyph(key: string): string { return sortGlyph(this.sort(), key); }
+  sortCol(key: string): void { this.sort.set(nextSort(this.sort(), key)); this.page.set(0); }
+  setFilter(v: string): void { this.filter.set(v); this.page.set(0); }
 
   get hasCost(): boolean {
     return !!this.costMapping && Object.keys(this.costMapping).length > 0;
@@ -173,6 +208,7 @@ export class ModelsPerformanceComponent implements OnInit {
 
   reload(): void {
     this.loading.set(true);
+    this.page.set(0);
     this.api.getPerformance(this.sortBy).subscribe({
       next: (rows) => {
         this.rows.set(Array.isArray(rows) ? rows : []);

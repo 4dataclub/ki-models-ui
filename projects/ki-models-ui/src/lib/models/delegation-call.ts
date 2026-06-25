@@ -1,0 +1,1 @@
+export interface DelegationCall { id: number; calledAt: string; provider: string | null; model: string | null; service: string | null; success: boolean; outputChars: number | null; promptSnippet: string | null; }

@@ -1,9 +1,11 @@
-import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { ProviderServer } from '../models/provider-server';
 import { ProviderServersLabels, PROVIDER_SERVERS_LABELS_EN } from '../models/labels';
+import { KiPagerComponent, paginate } from './ki-pager.component';
+import { SortState, nextSort, sortGlyph, sortRows, filterRows } from './table-tools';
 
 /**
  * v0.15.0 — Verwaltung benannter Inferenz-Server (llm-cascade ≥ 0.8.0).
@@ -22,7 +24,7 @@ import { ProviderServersLabels, PROVIDER_SERVERS_LABELS_EN } from '../models/lab
 @Component({
   selector: 'ki-provider-servers',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, KiPagerComponent],
   template: `
     <section class="ki-provider-servers">
       <header class="ki-ps-header">
@@ -33,17 +35,20 @@ import { ProviderServersLabels, PROVIDER_SERVERS_LABELS_EN } from '../models/lab
       <p *ngIf="loading()" class="ki-ps-muted">{{ L.loading }}</p>
 
       <div *ngIf="!loading()" class="ki-ps-table-wrap">
+        <input *ngIf="servers().length > 0"
+          class="ki-ps-filter" type="text" placeholder="Filtern…"
+          [value]="filter()" (input)="setFilter($any($event.target).value)" />
         <table class="ki-ps-table">
           <thead>
             <tr>
-              <th>{{ L.colName }}</th>
-              <th>{{ L.colBaseUrl }}</th>
+              <th class="ki-ps-sortable" (click)="sortCol('name')">{{ L.colName }} <span class="ki-ps-glyph">{{ glyph('name') }}</span></th>
+              <th class="ki-ps-sortable" (click)="sortCol('baseUrl')">{{ L.colBaseUrl }} <span class="ki-ps-glyph">{{ glyph('baseUrl') }}</span></th>
               <th>{{ L.colDefault }}</th>
               <th class="ki-ps-right">{{ L.colActions }}</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let s of servers()">
+            <tr *ngFor="let s of pageServers()">
               <td class="ki-ps-mono"><strong>{{ s.name }}</strong>
                 <div *ngIf="s.description" class="ki-ps-tiny ki-ps-muted">{{ s.description }}</div>
               </td>
@@ -62,6 +67,13 @@ import { ProviderServersLabels, PROVIDER_SERVERS_LABELS_EN } from '../models/lab
             </tr>
           </tbody>
         </table>
+
+        <ki-pager
+          [total]="viewServers().length"
+          [page]="page()"
+          [pageSize]="pageSize"
+          (pageChange)="page.set($event)">
+        </ki-pager>
       </div>
 
       <!-- Add / Edit form -->
@@ -90,6 +102,14 @@ import { ProviderServersLabels, PROVIDER_SERVERS_LABELS_EN } from '../models/lab
     .ki-ps-title { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #475569; margin: 0 0 0.25rem; }
     .ki-ps-subtitle { font-size: 0.75rem; color: #64748b; margin: 0 0 0.75rem; }
     .ki-ps-table-wrap { overflow-x: auto; }
+    .ki-ps-filter {
+      width: 100%; box-sizing: border-box; padding: 0.4rem 0.6rem;
+      margin-bottom: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.375rem;
+      font-size: 0.8rem;
+    }
+    .ki-ps-sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    .ki-ps-sortable:hover { color: #4f46e5; }
+    .ki-ps-glyph { font-size: 0.6rem; opacity: 0.6; }
     .ki-ps-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
     .ki-ps-table th { text-align: left; padding: 0.35rem 0.5rem; color: #64748b; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e2e8f0; }
     .ki-ps-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
@@ -120,12 +140,26 @@ export class ProviderServersComponent {
 
   private readonly api = inject(KiModelsApiService);
 
+  /** Seitengröße der Server-Tabelle. Pager nur sichtbar wenn mehr Zeilen. */
+  @Input() pageSize = 10;
+
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly servers = signal<ProviderServer[]>([]);
   readonly error = signal<string | null>(null);
+  readonly page = signal(0);
+  readonly filter = signal('');
+  readonly sort = signal<SortState>({ key: null, dir: null });
+  readonly viewServers = computed(() =>
+    sortRows(filterRows(this.servers(), this.filter(), ['name', 'baseUrl', 'description']), this.sort()),
+  );
+  readonly pageServers = computed(() => paginate(this.viewServers(), this.page(), this.pageSize));
   /** Name des aktuell editierten Servers; null = Add-Modus. */
   readonly editingName = signal<string | null>(null);
+
+  glyph(key: string): string { return sortGlyph(this.sort(), key); }
+  sortCol(key: string): void { this.sort.set(nextSort(this.sort(), key)); this.page.set(0); }
+  setFilter(v: string): void { this.filter.set(v); this.page.set(0); }
 
   formName = '';
   formBaseUrl = '';
@@ -139,6 +173,7 @@ export class ProviderServersComponent {
 
   reload(): void {
     this.loading.set(true);
+    this.page.set(0);
     this.api.listProviderServers().subscribe({
       next: (list) => { this.servers.set(list ?? []); this.loading.set(false); },
       error: () => { this.servers.set([]); this.loading.set(false); },

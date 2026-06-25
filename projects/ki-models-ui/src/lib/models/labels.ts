@@ -443,3 +443,114 @@ export const PROVIDER_SERVERS_LABELS_EN: ProviderServersLabels = {
   errorDeleteDefault: 'The default server cannot be deleted. Set another as default first.',
   confirmDelete: (name) => `Delete server "${name}"?`,
 };
+
+/**
+ * v0.18.0 — Labels für `<ki-call-overview>` (Erfolgs-Trend + Totals-Cards +
+ * geschätzte Kosten). Konsument überschreibt via [labels]; Defaults englisch.
+ */
+export interface CallOverviewLabels {
+  title: string;
+  subtitle: string;
+  trendTitle: string;
+  /** Card-Labels für die Totals-Reihe. */
+  card24h: string;
+  card7d: string;
+  card30d: string;
+  cardSuccess30d: string;
+  cardFailed30d: string;
+  /** Kosten-Summary. */
+  costTitle: string;
+  costChars: string;
+  costTokens: string;
+  costMoney: string;
+  loading: string;
+  empty: string;
+}
+
+export const CALL_OVERVIEW_LABELS_EN: CallOverviewLabels = {
+  title: 'AI Call Overview',
+  subtitle: 'Success trend, call totals and estimated cost across all providers.',
+  trendTitle: 'Success trend (30 days)',
+  card24h: 'Calls 24h',
+  card7d: 'Calls 7d',
+  card30d: 'Calls 30d',
+  cardSuccess30d: 'Success 30d',
+  cardFailed30d: 'Failed 30d',
+  costTitle: 'Estimated cost (30d)',
+  costChars: 'Output chars',
+  costTokens: 'Tokens (≈chars/4)',
+  costMoney: 'Cost',
+  loading: 'Loading call stats…',
+  empty: 'No calls recorded yet.',
+};
+
+/**
+ * v0.18.0 — Labels für `<ki-failover-analytics>` (Failover-out/Provider-Donut
+ * + Provider×Grund-Tabelle). Konsument überschreibt via [labels].
+ */
+export interface FailoverAnalyticsLabels {
+  title: string;
+  subtitle: string;
+  donutTitle: string;
+  donutCenter: string;
+  tableTitle: string;
+  colProvider: string;
+  colReason: string;
+  colCount: string;
+  loading: string;
+  empty: string;
+  timelineTitle: string;
+  timelineHint: string;
+  colType: string;
+  colTransition: string;
+  colWhen: string;
+  filterPlaceholder: string;
+}
+
+export const FAILOVER_ANALYTICS_LABELS_EN: FailoverAnalyticsLabels = {
+  title: 'Failover Analytics',
+  subtitle: 'Where the cascade dropped a model (last 30 days) — by provider and reason.',
+  donutTitle: 'Failover-out / provider',
+  donutCenter: 'OUT',
+  tableTitle: 'Provider × reason',
+  colProvider: 'Provider',
+  colReason: 'Reason',
+  colCount: 'Count',
+  loading: 'Loading failover stats…',
+  empty: 'No failover events in the last 30 days.',
+  timelineTitle: 'Failover events',
+  timelineHint: 'When the cascade switched (quota / 503 / promote-back) or a model was toggled — last 50.',
+  colType: 'Type',
+  colTransition: 'From → To',
+  colWhen: 'When',
+  filterPlaceholder: 'Filter…',
+};
+
+/**
+ * v0.20.0 — Labels für {@link import('../components/mode-events.component').ModeEventsComponent}.
+ * Eigene Liste der Modus-/Toggle-Umschaltungen (Modell-an/aus, Pool-Wechsel,
+ * Supermodell an/aus).
+ */
+export interface ModeEventsLabels {
+  title: string;
+  subtitle: string;
+  empty: string;
+  loading: string;
+  colType: string;
+  colTransition: string;
+  colReason: string;
+  colWhen: string;
+  filterPlaceholder: string;
+}
+
+export const MODE_EVENTS_LABELS_EN: ModeEventsLabels = {
+  title: 'Mode switches',
+  subtitle: 'Model toggles, pool changes and supermodel on/off — last 50.',
+  empty: 'No mode switches logged yet.',
+  loading: 'Loading mode switches…',
+  colType: 'Type',
+  colTransition: 'From → To',
+  colReason: 'Reason',
+  colWhen: 'When',
+  filterPlaceholder: 'Filter…',
+};

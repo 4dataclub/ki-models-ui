@@ -1,7 +1,9 @@
-import { Component, Input, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { CooldownRow } from '../models/cooldown';
+import { KiPagerComponent, paginate } from './ki-pager.component';
+import { SortState, nextSort, sortGlyph, sortRows, filterRows } from './table-tools';
 
 /**
  * v0.14.0 — Cooldown + Auto-Disable State pro Modell.
@@ -19,7 +21,7 @@ import { CooldownRow } from '../models/cooldown';
 @Component({
   selector: 'ki-models-cooldown-state',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, KiPagerComponent],
   template: `
     <div class="ki-cd">
       <div class="ki-header">
@@ -35,18 +37,22 @@ import { CooldownRow } from '../models/cooldown';
         Keine Modelle konfiguriert.
       </p>
 
+      <input *ngIf="rows().length > 0"
+        class="ki-filter" type="text" placeholder="Filtern…"
+        [value]="filter()" (input)="setFilter($any($event.target).value)" />
+
       <table *ngIf="rows().length > 0" class="ki-table">
         <thead>
           <tr>
             <th></th>
-            <th>Modell</th>
-            <th>Kategorie</th>
+            <th class="ki-sortable" (click)="sortCol('modelId')">Modell <span class="ki-glyph">{{ glyph('modelId') }}</span></th>
+            <th class="ki-sortable" (click)="sortCol('category')">Kategorie <span class="ki-glyph">{{ glyph('category') }}</span></th>
             <th class="ki-right">Status</th>
             <th>Grund</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let r of rows()"
+          <tr *ngFor="let r of pageRows()"
               [class.ki-row-killed]="r.autoDisabled"
               [class.ki-row-cooldown]="!r.autoDisabled && liveRemaining(r) > 0">
             <td class="ki-icon">
@@ -77,6 +83,13 @@ import { CooldownRow } from '../models/cooldown';
         </tbody>
       </table>
 
+      <ki-pager
+        [total]="viewRows().length"
+        [page]="page()"
+        [pageSize]="pageSize"
+        (pageChange)="page.set($event)">
+      </ki-pager>
+
       <p class="ki-foot ki-tiny ki-muted">
         Auto-Refresh alle {{ autoRefreshSec }}s. Cooldown-Zähler lebt im
         Backend, hier wird er nur visualisiert.
@@ -98,12 +111,20 @@ import { CooldownRow } from '../models/cooldown';
       padding: 0.35rem 0.6rem; background: #e0e7ff; color: #3730a3;
       border: none; border-radius: 0.375rem; font-size: 0.8rem; cursor: pointer;
     }
+    .ki-filter {
+      width: 100%; box-sizing: border-box; padding: 0.4rem 0.6rem;
+      margin-bottom: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.375rem;
+      font-size: 0.8rem;
+    }
     .ki-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .ki-table thead tr { border-bottom: 2px solid #e2e8f0; }
     .ki-table th {
       padding: 0.5rem 0.6rem; text-align: left; text-transform: uppercase;
       font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; color: #64748b;
     }
+    .ki-sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    .ki-sortable:hover { color: #4f46e5; }
+    .ki-glyph { font-size: 0.6rem; opacity: 0.6; }
     .ki-table td { padding: 0.55rem 0.6rem; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
     .ki-row-killed { background: linear-gradient(90deg, #fef2f2 0%, transparent 100%); }
     .ki-row-cooldown { background: linear-gradient(90deg, #fffbeb 0%, transparent 100%); }
@@ -137,8 +158,26 @@ export class ModelsCooldownStateComponent implements OnInit, OnDestroy {
   /** Auto-Refresh-Intervall in Sekunden. Default 30s. 0 disabled. */
   @Input() autoRefreshSec = 30;
 
+  /** Seitengröße. Pager nur sichtbar wenn mehr Zeilen. Kein Page-Reset beim
+   *  Auto-Refresh — paginate() klemmt defensiv. */
+  @Input() pageSize = 10;
+
   readonly rows = signal<CooldownRow[]>([]);
   readonly loading = signal(true);
+  readonly page = signal(0);
+  readonly filter = signal('');
+  readonly sort = signal<SortState>({ key: null, dir: null });
+  readonly viewRows = computed(() =>
+    sortRows(
+      filterRows(this.rows(), this.filter(), ['provider', 'modelId', 'displayName', 'category', 'autoDisabledReason']),
+      this.sort(),
+    ),
+  );
+  readonly pageRows = computed(() => paginate(this.viewRows(), this.page(), this.pageSize));
+
+  glyph(key: string): string { return sortGlyph(this.sort(), key); }
+  sortCol(key: string): void { this.sort.set(nextSort(this.sort(), key)); this.page.set(0); }
+  setFilter(v: string): void { this.filter.set(v); this.page.set(0); }
 
   /** v0.15.0 — 1s-Tick, lässt den Cooldown-Zähler zwischen den Reloads sichtbar
    *  runterlaufen. `fetchedAt` = Zeitpunkt des letzten Backend-Werts. */

@@ -12,6 +12,11 @@ import { QualityStatRow } from '../models/quality';
 import { PerformanceRow } from '../models/performance';
 import { CooldownRow } from '../models/cooldown';
 import { ProviderServer, ProviderServerUpsert } from '../models/provider-server';
+import { AppSetting } from '../models/app-setting';
+import { DelegationCall } from '../models/delegation-call';
+import { TrendPoint } from '../models/stats-trend';
+import { StatsTotals } from '../models/stats-totals';
+import { FailoverBreakdown, FailoverEvents } from '../models/stats-failover';
 
 /**
  * Library-API-Service. Spricht alle KI-Modell-/API-Key-/Cascade-Endpoints
@@ -363,6 +368,75 @@ export class KiModelsApiService {
   deleteProviderServer(name: string): Observable<{ ok: boolean }> {
     return this.http.delete<{ ok: boolean }>(
       `${this.base}/provider-servers/${encodeURIComponent(name)}`,
+    );
+  }
+
+  // ─── App-Settings + Delegation-Calls (v0.17.0) ───────────────────────────
+
+  getSettings(): Observable<AppSetting[]> {
+    return this.http.get<any>(`${this.base}/settings`).pipe(
+      map((r): AppSetting[] => Array.isArray(r)
+        ? r.map(x => ({ key: x.key ?? x.settingKey, value: String(x.value ?? '') }))
+        : []),
+    );
+  }
+
+  setSetting(key: string, value: string): Observable<{ ok: boolean }> {
+    return this.http.post<{ ok: boolean }>(`${this.base}/settings/${encodeURIComponent(key)}`, { value });
+  }
+
+  getDelegationCalls(): Observable<DelegationCall[]> {
+    return this.http.get<DelegationCall[]>(`${this.base}/stats/calls`);
+  }
+
+  // ─── Shared-Analytics (v0.18.0 — cascade ≥ 0.9 / Switcher-Proxy) ─────────
+
+  /**
+   * Erfolgs-Trend pro Tag (Calls total/success/failed) der letzten `days`
+   * Tage. Speist den Area-Chart in `<ki-call-overview>`. Bei Backend ohne
+   * Endpoint liefert der Proxy ein leeres Array.
+   */
+  getStatsTrend(days = 30): Observable<TrendPoint[]> {
+    return this.http.get<TrendPoint[]>(`${this.base}/stats/trend?days=${days}`).pipe(
+      map((r) => Array.isArray(r) ? r : []),
+    );
+  }
+
+  /**
+   * KI-Calls-Totals (24h/7d/30d + Erfolg/Fehlschlag + Output-Chars).
+   * Speist die Übersichts-Cards + Kosten-Schätzung in `<ki-call-overview>`.
+   */
+  getStatsTotals(): Observable<StatsTotals> {
+    return this.http.get<StatsTotals>(`${this.base}/stats/totals`).pipe(
+      map((r) => (r && typeof r === 'object') ? r : {}),
+    );
+  }
+
+  /**
+   * Failover-Aufschlüsselung (Provider/Grund, 30 Tage). Speist Donut +
+   * Tabelle in `<ki-failover-analytics>`. Leer-Objekt-Felder werden auf
+   * leere Arrays normalisiert.
+   */
+  getStatsFailoverBreakdown(): Observable<FailoverBreakdown> {
+    return this.http.get<any>(`${this.base}/stats/failover-breakdown`).pipe(
+      map((r): FailoverBreakdown => ({
+        byProvider: Array.isArray(r?.byProvider) ? r.byProvider : [],
+        byProviderReason: Array.isArray(r?.byProviderReason) ? r.byProviderReason : [],
+        byReason: Array.isArray(r?.byReason) ? r.byReason : [],
+      })),
+    );
+  }
+
+  /**
+   * v0.19.0 — Failover-/Toggle-Events-Timeline (letzte 50 + total30d).
+   * Speist die Timeline in `<ki-failover-analytics>`. Leer-Fallback.
+   */
+  getStatsFailover(): Observable<FailoverEvents> {
+    return this.http.get<any>(`${this.base}/stats/failover`).pipe(
+      map((r): FailoverEvents => ({
+        recent: Array.isArray(r?.recent) ? r.recent : [],
+        total30d: typeof r?.total30d === 'number' ? r.total30d : 0,
+      })),
     );
   }
 }
