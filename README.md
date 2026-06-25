@@ -494,6 +494,62 @@ ein bzw. lud nur einmal — der Status „aktualisierte sich nicht".
 
 ---
 
+## Single-Source-Seite `<ki-models-page>` (v0.17.0)
+
+Statt jede `<ki-*>`-Sektion einzeln zu mounten, rendert **`<ki-models-page>`**
+die komplette KI-Modell-Admin-Seite in kanonischer Reihenfolge (Verwaltung →
+Supermodell → Statistiken). Ein nacktes `<ki-models-page></ki-models-page>`
+funktioniert mit deutschen Defaults; alle Labels/Kategorie-Configs werden über
+ein optionales `[config]`-Bündel (`KiModelsPageConfig`) durchgereicht. Ziel:
+**Konsumenten mounten eine einzige Komponente — keine produktspezifische
+Snowflake.**
+
+```html
+<ki-models-page
+  [config]="pageConfig"
+  [activePool]="activePool()"
+  [supermodelOn]="supermodel()"
+  (activeModelChanged)="onSwitchToModel($event)"
+  (modelChanged)="reload()"
+></ki-models-page>
+```
+
+Enthaltene Sektionen: `ki-cascade-cooldown`, `ki-cascades-view`,
+`ki-models-table`, `ki-add-model-form`, `ki-api-keys-section`,
+`ki-privacy-settings`, `ki-supermodel-matrix`, `ki-provider-servers`,
+`ki-models-quality-stats`, `ki-models-performance`, `ki-models-cooldown-state`,
+`ki-routing-decisions`, `ki-delegation-live`. `reload()` ist öffentlich — der
+Host ruft es nach Pool-/Config-Wechsel (lädt Tabelle, Cascades-View und Matrix neu).
+
+### Neue Komponenten (v0.17.0)
+
+- **`<ki-supermodel-matrix>`** — Rollen-im-Pool-Matrix (Compound-Kategorien
+  `<role>-<pool>`). Achsen konfigurierbar (`[pools]`, `[roles]`), Default
+  cloud/free/local × orchestrator/implement/review/research/dispatch.
+  **`[supermodelOn]` Default FALSE** — rendert nichts, bis der Host explizit
+  einschaltet. `[disabled]=true` → sichtbar, aber gedimmt/gesperrt (EduPro-
+  Vorschau). Kein Compound-Kategorie-Match → ruhiger Empty-State statt Crash.
+- **`<ki-privacy-settings>`** — Datenschutz-Toggle für `logPromptSnippet`.
+  **Default AUS (fail-closed)**; AN speichert pro Delegations-Call max. 160
+  Zeichen Prompt-Ausschnitt (nur Debug/Live-Watch). Liest/schreibt via
+  `getSettings()`/`setSetting()`.
+- **`<ki-delegation-live>`** — Browser-Watcher der letzten Cascade-Aufrufe
+  (Zeit, ✓/✗, `provider:model`, `[service]`, Output-Chars, Prompt-Snippet
+  falls vorhanden). Auto-Refresh (`[autoRefreshSec]`, Default 5s), `[maxRows]`.
+
+### Neue Service-Methoden (`KiModelsApiService`, v0.17.0)
+
+```ts
+getSettings(): Observable<AppSetting[]>                 // GET  {base}/settings
+setSetting(key: string, value: string): Observable<…>   // POST {base}/settings/{key}
+getDelegationCalls(): Observable<DelegationCall[]>       // GET  {base}/stats/calls
+```
+
+Neue Interfaces: `AppSetting { key; value }`,
+`DelegationCall { id; calledAt; provider; model; service; success; outputChars; promptSnippet }`.
+
+---
+
 ## Backend-Vertrag
 
 Konsumenten-Backend muss folgende Endpoints unter der konfigurierten Base
