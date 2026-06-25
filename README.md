@@ -307,6 +307,48 @@ Routing-Pfad.** Du als Admin definierst nur die Kategorien + descriptions.
 
 ---
 
+## Eine Frage, drei Türen — wer wählt die Kategorie?
+
+Die Mechanismen oben füllen pro Call **denselben einen `category`-Schlitz**.
+Stell dir die Cascade als **Poststelle mit beschrifteten Fächern** vor: jede
+Anfrage ist ein Brief, der in genau **ein** Fach muss. Es gibt **eine Frage** —
+*„welches Fach / welcher Spezialist?"* — und drei Türen zur Antwort, mit fester
+Präzedenz (`ApiController` im Backend):
+
+```
+ ① Body-`category`          → explizites Etikett (der Caller weiß es schon)
+   │   schlägt …
+ ② preferredCategory-Toggle → manueller Override (Pool-/Bereich-Hebel in der UI)
+   │   schlägt …
+ ③ purpose                  → SemanticCategoryRouter rät aus dem Inhalt
+```
+
+**Immer nur EINE Tür pro Brief** (① > ② > ③), nie zwei gleichzeitig. Das ist
+genau der Mechanismus, den die `<ki-cascade-mode-panel>`-Komponente bedient:
+ein Klick auf ein Bereich-Tab setzt ② (`preferredCategory`), das „Auto"-Tab
+leert ihn wieder → zurück auf ③.
+
+**Dieselbe Library, zwei Produkte — andere Tür:**
+
+```
+EduPro:    Briefe ohne Etikett → Tür ③ klassifiziert nach Task-Typ (1 Achse)
+  ┌─────────┬──────┬─────────┬─────────┐
+  │ Content │ Dev  │ Utility │ General │   ← Router/Toggle wählt
+  └─────────┴──────┴─────────┴─────────┘
+
+Switcher:  Orchestrator-Agent klebt Etiketten vorher → Tür ① (2 Achsen)
+                cloud      free      local   ← Pool: Hebel ②
+  orchestr. │ o-cloud  │ o-free  │ o-local │
+  implement │ i-cloud  │ i-free  │ i-local │  ← Rolle: Etikett ①
+  review …  │   …      │   …     │   …     │
+```
+
+Beide Konsumenten nutzen **dieselben Komponenten + denselben Backend-Pfad** —
+der Unterschied ist nur, **wer** die Kategorie wählt und auf welcher Achse,
+nicht der Code. (Die Matrix-Darstellung ist generisch: Achsen werden aus der
+Backend-Kategorienliste abgeleitet; ein Produkt ohne Compound-Kategorien zeigt
+die Rollen-Achse einfach nicht.)
+
 ## Konsumenten-Unterschied: Auto vs. Manuell
 
 Nicht jeder Konsument will dass das System komplett autonom entscheidet.
