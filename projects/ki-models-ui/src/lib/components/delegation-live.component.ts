@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { DelegationCall } from '../models/delegation-call';
 import { KiPagerComponent, paginate } from './ki-pager.component';
+import { SortState, nextSort, sortGlyph, sortRows, filterRows } from './table-tools';
 
 /**
  * v0.17.0 — Live-Browser-Watcher für Delegations-Calls.
@@ -40,14 +41,18 @@ import { KiPagerComponent, paginate } from './ki-pager.component';
         Noch keine Delegations-Calls.
       </p>
 
+      <input *ngIf="!loading() && !error() && rows().length > 0"
+        class="ki-filter" type="text" placeholder="Filtern…"
+        [value]="filter()" (input)="setFilter($any($event.target).value)" />
+
       <table *ngIf="!loading() && !error() && rows().length > 0" class="ki-table">
         <thead>
           <tr>
             <th></th>
-            <th>Zeit</th>
-            <th>Provider : Modell</th>
-            <th>[Service]</th>
-            <th class="ki-right">Chars</th>
+            <th class="ki-sortable" (click)="sortCol('calledAt')">Zeit <span class="ki-glyph">{{ glyph('calledAt') }}</span></th>
+            <th class="ki-sortable" (click)="sortCol('provider')">Provider : Modell <span class="ki-glyph">{{ glyph('provider') }}</span></th>
+            <th class="ki-sortable" (click)="sortCol('service')">[Service] <span class="ki-glyph">{{ glyph('service') }}</span></th>
+            <th class="ki-right ki-sortable" (click)="sortCol('outputChars')">Chars <span class="ki-glyph">{{ glyph('outputChars') }}</span></th>
             <th class="ki-snippet-head">Snippet</th>
           </tr>
         </thead>
@@ -76,7 +81,7 @@ import { KiPagerComponent, paginate } from './ki-pager.component';
       </table>
 
       <ki-pager
-        [total]="rows().length"
+        [total]="viewRows().length"
         [page]="page()"
         [pageSize]="pageSize"
         (pageChange)="page.set($event)">
@@ -102,6 +107,14 @@ import { KiPagerComponent, paginate } from './ki-pager.component';
       padding: 0.35rem 0.6rem; background: #e0e7ff; color: #3730a3;
       border: none; border-radius: 0.375rem; font-size: 0.8rem; cursor: pointer;
     }
+    .ki-filter {
+      width: 100%; box-sizing: border-box; padding: 0.4rem 0.6rem;
+      margin-bottom: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.375rem;
+      font-size: 0.8rem;
+    }
+    .ki-sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    .ki-sortable:hover { color: #4f46e5; }
+    .ki-glyph { font-size: 0.6rem; opacity: 0.6; }
     .ki-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .ki-table thead tr { border-bottom: 2px solid #e2e8f0; }
     .ki-table th {
@@ -139,15 +152,24 @@ export class DelegationLiveComponent implements OnInit, OnDestroy {
   @Input() maxRows = 50;
 
   /** Seitengröße. Pager nur sichtbar wenn mehr Zeilen geladen sind. */
-  @Input() pageSize = 25;
+  @Input() pageSize = 10;
 
   readonly rows = signal<DelegationCall[]>([]);
   readonly loading = signal(true);
   readonly error = signal(false);
   readonly page = signal(0);
+  readonly filter = signal('');
+  readonly sort = signal<SortState>({ key: null, dir: null });
+  readonly viewRows = computed(() =>
+    sortRows(filterRows(this.rows(), this.filter(), ['provider', 'model', 'service', 'promptSnippet']), this.sort()),
+  );
   // Kein Page-Reset beim Auto-Refresh — paginate() klemmt die Seite defensiv,
   // sonst würde die Tabelle alle 5s auf Seite 0 zurückspringen.
-  readonly pageRows = computed(() => paginate(this.rows(), this.page(), this.pageSize));
+  readonly pageRows = computed(() => paginate(this.viewRows(), this.page(), this.pageSize));
+
+  glyph(key: string): string { return sortGlyph(this.sort(), key); }
+  sortCol(key: string): void { this.sort.set(nextSort(this.sort(), key)); this.page.set(0); }
+  setFilter(v: string): void { this.filter.set(v); this.page.set(0); }
 
   private timer: ReturnType<typeof setInterval> | null = null;
 

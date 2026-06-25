@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { QualityStatRow } from '../models/quality';
 import { KiPagerComponent, paginate } from './ki-pager.component';
+import { SortState, nextSort, sortGlyph, sortRows, filterRows } from './table-tools';
 
 /**
  * v0.7.1 / Library v0.12.0 — Quality-Bewertung pro Modell aus den letzten
@@ -84,16 +85,20 @@ import { KiPagerComponent, paginate } from './ki-pager.component';
         Noch keine Stats — Modelle wurden in den letzten 30 Tagen nicht aufgerufen.
       </p>
 
+      <input *ngIf="rows().length > 0"
+        class="ki-filter" type="text" placeholder="Filtern…"
+        [value]="filter()" (input)="setFilter($any($event.target).value)" />
+
       <table *ngIf="rows().length > 0" class="ki-table">
         <thead>
           <tr>
             <th></th>
-            <th>Modell</th>
-            <th>Kategorie</th>
-            <th class="ki-right">Score</th>
-            <th class="ki-right">Erfolg</th>
-            <th class="ki-right">Calls (30d)</th>
-            <th class="ki-right">Ø Chars</th>
+            <th class="ki-sortable" (click)="sortCol('modelId')">Modell <span class="ki-glyph">{{ glyph('modelId') }}</span></th>
+            <th class="ki-sortable" (click)="sortCol('category')">Kategorie <span class="ki-glyph">{{ glyph('category') }}</span></th>
+            <th class="ki-right ki-sortable" (click)="sortCol('score')">Score <span class="ki-glyph">{{ glyph('score') }}</span></th>
+            <th class="ki-right ki-sortable" (click)="sortCol('successRate')">Erfolg <span class="ki-glyph">{{ glyph('successRate') }}</span></th>
+            <th class="ki-right ki-sortable" (click)="sortCol('callsLast30d')">Calls (30d) <span class="ki-glyph">{{ glyph('callsLast30d') }}</span></th>
+            <th class="ki-right ki-sortable" (click)="sortCol('avgChars')">Ø Chars <span class="ki-glyph">{{ glyph('avgChars') }}</span></th>
             <th></th>
           </tr>
         </thead>
@@ -122,7 +127,7 @@ import { KiPagerComponent, paginate } from './ki-pager.component';
       </table>
 
       <ki-pager
-        [total]="rows().length"
+        [total]="viewRows().length"
         [page]="page()"
         [pageSize]="pageSize"
         (pageChange)="page.set($event)">
@@ -170,12 +175,20 @@ import { KiPagerComponent, paginate } from './ki-pager.component';
       font-weight: 700; padding: 0 0.25rem; opacity: 0.6;
     }
     .ki-result-dismiss:hover { opacity: 1; }
+    .ki-filter {
+      width: 100%; box-sizing: border-box; padding: 0.4rem 0.6rem;
+      margin-bottom: 0.5rem; border: 1px solid #e2e8f0; border-radius: 0.375rem;
+      font-size: 0.8rem;
+    }
     .ki-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .ki-table thead tr { border-bottom: 2px solid #e2e8f0; }
     .ki-table th {
       padding: 0.5rem 0.6rem; text-align: left; text-transform: uppercase;
       font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; color: #64748b;
     }
+    .ki-sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    .ki-sortable:hover { color: #4f46e5; }
+    .ki-glyph { font-size: 0.6rem; opacity: 0.6; }
     .ki-table td { padding: 0.55rem 0.6rem; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
     .ki-row-kill { background: linear-gradient(90deg, #fef2f2 0%, transparent 100%); }
     .ki-row-weak { background: linear-gradient(90deg, #fffbeb 0%, transparent 100%); }
@@ -208,12 +221,24 @@ export class ModelsQualityStatsComponent implements OnInit {
   sortBy: 'worst-first' | 'best-first' | 'calls-desc' = 'worst-first';
 
   /** Seitengröße der Tabelle. Pager nur sichtbar wenn mehr Zeilen. */
-  @Input() pageSize = 25;
+  @Input() pageSize = 10;
 
   readonly rows = signal<QualityStatRow[]>([]);
   readonly loading = signal(true);
   readonly page = signal(0);
-  readonly pageRows = computed(() => paginate(this.rows(), this.page(), this.pageSize));
+  readonly filter = signal('');
+  readonly sort = signal<SortState>({ key: null, dir: null });
+  readonly viewRows = computed(() =>
+    sortRows(
+      filterRows(this.rows(), this.filter(), ['provider', 'modelId', 'displayName', 'category']),
+      this.sort(),
+    ),
+  );
+  readonly pageRows = computed(() => paginate(this.viewRows(), this.page(), this.pageSize));
+
+  glyph(key: string): string { return sortGlyph(this.sort(), key); }
+  sortCol(key: string): void { this.sort.set(nextSort(this.sort(), key)); this.page.set(0); }
+  setFilter(v: string): void { this.filter.set(v); this.page.set(0); }
 
   // v0.12.1: Auto-Disable-Trigger
   readonly running = signal(false);

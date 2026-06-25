@@ -24,3 +24,22 @@ export interface FailoverBreakdown {
   byProviderReason: FailoverByProviderReason[];
   byReason: FailoverByReason[];
 }
+
+/**
+ * v0.19.0 — Einzelnes Failover-/Toggle-Event in der Timeline.
+ * Quelle: `GET {base}/stats/failover` → `{ recent: [], total30d }`.
+ * `type`: switch_down | switch_up | promote_primary | toggle_on | toggle_off.
+ */
+export interface FailoverEvent {
+  type: string;
+  fromModel?: string | null;
+  toModel?: string | null;
+  reason?: string | null;
+  cooldownSec?: number | null;
+  occurredAt: string;
+}
+
+export interface FailoverEvents {
+  recent: FailoverEvent[];
+  total30d: number;
+}

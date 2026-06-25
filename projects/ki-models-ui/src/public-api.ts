@@ -50,4 +50,5 @@ export * from './lib/components/ki-area-chart.component';
 export * from './lib/components/ki-donut-chart.component';
 export * from './lib/components/call-overview.component';
 export * from './lib/components/failover-analytics.component';
+export * from './lib/components/mode-events.component';
 export * from './lib/components/models-page.component';

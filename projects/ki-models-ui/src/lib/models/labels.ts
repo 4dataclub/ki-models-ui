@@ -499,6 +499,12 @@ export interface FailoverAnalyticsLabels {
   colCount: string;
   loading: string;
   empty: string;
+  timelineTitle: string;
+  timelineHint: string;
+  colType: string;
+  colTransition: string;
+  colWhen: string;
+  filterPlaceholder: string;
 }
 
 export const FAILOVER_ANALYTICS_LABELS_EN: FailoverAnalyticsLabels = {
@@ -512,4 +518,39 @@ export const FAILOVER_ANALYTICS_LABELS_EN: FailoverAnalyticsLabels = {
   colCount: 'Count',
   loading: 'Loading failover stats…',
   empty: 'No failover events in the last 30 days.',
+  timelineTitle: 'Failover events',
+  timelineHint: 'When the cascade switched (quota / 503 / promote-back) or a model was toggled — last 50.',
+  colType: 'Type',
+  colTransition: 'From → To',
+  colWhen: 'When',
+  filterPlaceholder: 'Filter…',
+};
+
+/**
+ * v0.20.0 — Labels für {@link import('../components/mode-events.component').ModeEventsComponent}.
+ * Eigene Liste der Modus-/Toggle-Umschaltungen (Modell-an/aus, Pool-Wechsel,
+ * Supermodell an/aus).
+ */
+export interface ModeEventsLabels {
+  title: string;
+  subtitle: string;
+  empty: string;
+  loading: string;
+  colType: string;
+  colTransition: string;
+  colReason: string;
+  colWhen: string;
+  filterPlaceholder: string;
+}
+
+export const MODE_EVENTS_LABELS_EN: ModeEventsLabels = {
+  title: 'Mode switches',
+  subtitle: 'Model toggles, pool changes and supermodel on/off — last 50.',
+  empty: 'No mode switches logged yet.',
+  loading: 'Loading mode switches…',
+  colType: 'Type',
+  colTransition: 'From → To',
+  colReason: 'Reason',
+  colWhen: 'When',
+  filterPlaceholder: 'Filter…',
 };

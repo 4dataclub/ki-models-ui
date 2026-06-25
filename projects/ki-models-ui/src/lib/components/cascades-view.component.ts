@@ -45,16 +45,16 @@ import {
       </div>
 
       <!-- Empty state — Backend liefert kein /cascades oder leere Liste -->
-      <div *ngIf="!loading() && cascades().length === 0"
+      <div *ngIf="!loading() && displayedCascades().length === 0"
            class="rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 p-6 text-center text-sm text-slate-500 dark:text-slate-400">
         <p class="font-medium">{{ L.empty }}</p>
         <p class="mt-1 text-xs">{{ L.emptyHint }}</p>
       </div>
 
       <!-- Cascade-Karten — eine pro Bereich -->
-      <div *ngIf="!loading() && cascades().length > 0"
+      <div *ngIf="!loading() && displayedCascades().length > 0"
            class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <article *ngFor="let c of cascades()"
+        <article *ngFor="let c of displayedCascades()"
                  class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
           <!-- Header -->
           <header class="mb-4 flex items-start justify-between gap-3">
@@ -209,6 +209,27 @@ export class CascadesViewComponent implements OnInit, OnDestroy {
   readonly loading = signal(true);
   readonly cascades = signal<Cascade[]>([]);
   readonly allModels = signal<AiModel[]>([]);
+
+  /**
+   * Optionale Whitelist sichtbarer Cascade-Namen. `null`/`undefined` (Default) →
+   * alle vom Backend gelieferten (bereits pool-gefilterten) Cascaden werden
+   * gezeigt. Wird eine Liste gesetzt, werden NUR diese gerendert — der Switcher
+   * blendet so je nach Supermodell-Zustand entweder nur die Pool-Cascade oder
+   * nur die Rollen-Cascaden ein.
+   */
+  private readonly _visibleCascades = signal<string[] | null>(null);
+  @Input() set visibleCascades(v: string[] | null | undefined) {
+    this._visibleCascades.set(v ?? null);
+  }
+
+  /** Cascaden nach optionaler Whitelist gefiltert (Template iteriert darüber). */
+  readonly displayedCascades = computed<Cascade[]>(() => {
+    const allow = this._visibleCascades();
+    const list = this.cascades();
+    if (allow == null) return list;
+    const set = new Set(allow);
+    return list.filter((c) => set.has(c.name));
+  });
 
   /**
    * Display-Metadaten pro Kategorie (v0.10.0). Wird beim init aus

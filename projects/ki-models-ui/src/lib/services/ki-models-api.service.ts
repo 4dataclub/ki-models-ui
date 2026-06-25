@@ -16,7 +16,7 @@ import { AppSetting } from '../models/app-setting';
 import { DelegationCall } from '../models/delegation-call';
 import { TrendPoint } from '../models/stats-trend';
 import { StatsTotals } from '../models/stats-totals';
-import { FailoverBreakdown } from '../models/stats-failover';
+import { FailoverBreakdown, FailoverEvents } from '../models/stats-failover';
 
 /**
  * Library-API-Service. Spricht alle KI-Modell-/API-Key-/Cascade-Endpoints
@@ -423,6 +423,19 @@ export class KiModelsApiService {
         byProvider: Array.isArray(r?.byProvider) ? r.byProvider : [],
         byProviderReason: Array.isArray(r?.byProviderReason) ? r.byProviderReason : [],
         byReason: Array.isArray(r?.byReason) ? r.byReason : [],
+      })),
+    );
+  }
+
+  /**
+   * v0.19.0 — Failover-/Toggle-Events-Timeline (letzte 50 + total30d).
+   * Speist die Timeline in `<ki-failover-analytics>`. Leer-Fallback.
+   */
+  getStatsFailover(): Observable<FailoverEvents> {
+    return this.http.get<any>(`${this.base}/stats/failover`).pipe(
+      map((r): FailoverEvents => ({
+        recent: Array.isArray(r?.recent) ? r.recent : [],
+        total30d: typeof r?.total30d === 'number' ? r.total30d : 0,
       })),
     );
   }

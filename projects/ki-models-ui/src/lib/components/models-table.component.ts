@@ -5,6 +5,7 @@ import { AiModel } from '../models/ai-model';
 import { ProviderServer } from '../models/provider-server';
 import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
 import { KiPagerComponent, paginate } from './ki-pager.component';
+import { filterRows } from './table-tools';
 
 /**
  * Tabelle aller AI-Modelle in der Cascade-Reihenfolge.
@@ -32,6 +33,10 @@ import { KiPagerComponent, paginate } from './ki-pager.component';
       <div class="ki-models-table-header">
         <button (click)="reload()" class="ki-btn-secondary">↻ {{ L.refresh }}</button>
       </div>
+
+      <input *ngIf="!loading() && models().length > 0"
+        class="ki-filter" type="text" placeholder="Filtern…"
+        [value]="filter()" (input)="setFilter($any($event.target).value)" />
 
       <div *ngIf="loading()" class="ki-muted">{{ L.loading }}</div>
 
@@ -158,6 +163,11 @@ import { KiPagerComponent, paginate } from './ki-pager.component';
   styles: [`
     .ki-models-table { font-family: inherit; }
     .ki-models-table-header { display: flex; justify-content: flex-end; margin-bottom: 0.75rem; }
+    .ki-filter {
+      width: 100%; box-sizing: border-box; padding: 0.4rem 0.6rem;
+      margin-bottom: 1rem; border: 1px solid #e2e8f0; border-radius: 0.375rem;
+      font-size: 0.8rem;
+    }
     .ki-category-section { margin-bottom: 2rem; }
     .ki-category-section:last-child { margin-bottom: 0; }
     .ki-category-header { margin-bottom: 0.5rem; }
@@ -301,6 +311,15 @@ export class ModelsTableComponent {
   @Input() categoryOrder: string[] = [];
 
   /**
+   * Optionale Whitelist sichtbarer Kategorien. `null`/`undefined` (Default) →
+   * alle Kategorien mit Modellen werden gezeigt (EduPro-Verhalten). Wird eine
+   * Liste gesetzt, werden NUR diese Kategorien gerendert — der Switcher nutzt
+   * das, um je nach Pool/Supermodell-Zustand nur die passenden Cascaden zu
+   * zeigen (Supermodell AUS → nur Pool-Kategorie; AN → nur Rollen-Kategorien).
+   */
+  @Input() visibleCategories: string[] | null = null;
+
+  /**
    * v0.11.3 — Konsumenten-spezifische Liste von Provider-Namen die keinen
    * API-Key brauchen. Zusätzlich zu dem `keyless`-Flag aus dem Backend.
    *
@@ -317,12 +336,18 @@ export class ModelsTableComponent {
   @Input() keylessProviders: string[] = [];
 
   /** Seitengröße pro Kategorie-Section. Pager nur sichtbar wenn mehr Zeilen. */
-  @Input() pageSize = 25;
+  @Input() pageSize = 10;
 
   private readonly api = inject(KiModelsApiService);
 
   readonly loading = signal(true);
   readonly models = signal<AiModel[]>([]);
+  readonly filter = signal('');
+  /** Gefilterte Modelle (über alle Kategorien). Reorder operiert weiter auf der
+   *  vollen `models()`-Liste, nur die Anzeige/Gruppierung wird gefiltert. */
+  readonly filteredModels = computed(() =>
+    filterRows(this.models(), this.filter(), ['provider', 'modelId', 'displayName', 'category']),
+  );
   /** Aktuelle Seite je Kategorie (0-basiert). Default 0. */
   readonly pageByCategory = signal<Record<string, number>>({});
   readonly testResult = signal<Record<number, { ok?: boolean; latencyMs?: number; error?: string; pending?: boolean; skipped?: boolean }>>({});
@@ -337,7 +362,7 @@ export class ModelsTableComponent {
    */
   readonly modelsByCategory = computed<Record<string, AiModel[]>>(() => {
     const buckets: Record<string, AiModel[]> = {};
-    for (const m of this.models()) {
+    for (const m of this.filteredModels()) {
       const cat = m.category && m.category.trim() ? m.category : 'general';
       (buckets[cat] ??= []).push(m);
     }
@@ -359,12 +384,16 @@ export class ModelsTableComponent {
     for (const c of this.categoryOrder) {
       if (by[c]?.length && !seen.has(c)) { ordered.push(c); seen.add(c); }
     }
-    for (const m of this.models()) {
+    for (const m of this.filteredModels()) {
       const c = m.category && m.category.trim() ? m.category : 'general';
       if (by[c]?.length && !seen.has(c)) { ordered.push(c); seen.add(c); }
     }
     for (const c of present) {
       if (!seen.has(c)) { ordered.push(c); seen.add(c); }
+    }
+    if (this.visibleCategories != null) {
+      const allow = new Set(this.visibleCategories);
+      return ordered.filter((c) => allow.has(c));
     }
     return ordered;
   });
@@ -420,6 +449,8 @@ export class ModelsTableComponent {
       error: () => this.loading.set(false),
     });
   }
+
+  setFilter(v: string): void { this.filter.set(v); this.pageByCategory.set({}); }
 
   /** Aktuelle Seite einer Kategorie (0-basiert, Default 0). */
   catPage(cat: string): number {

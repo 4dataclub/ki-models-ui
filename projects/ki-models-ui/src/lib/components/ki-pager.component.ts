@@ -43,7 +43,7 @@ import { CommonModule } from '@angular/common';
 export class KiPagerComponent {
   @Input() total = 0;
   @Input() page = 0;
-  @Input() pageSize = 25;
+  @Input() pageSize = 10;
   @Output() pageChange = new EventEmitter<number>();
 
   get lastPage(): number {

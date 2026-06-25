@@ -114,6 +114,7 @@ export interface KiModelsPageConfig {
         [chainLabels]="config.cascadeChainLabels"
         [hintByCascade]="config.cascadeHints ?? {}"
         [providerOptions]="config.cascadeProviderOptions ?? []"
+        [visibleCascades]="visibleCategories"
         (cascadeChanged)="onCascadeChanged()">
       </ki-cascades-view>
     </section>
@@ -127,6 +128,7 @@ export interface KiModelsPageConfig {
         [categoryHints]="config.categoryHints ?? {}"
         [categoryOrder]="config.categoryOrder ?? []"
         [keylessProviders]="config.keylessProviders ?? []"
+        [visibleCategories]="visibleCategories"
         (modelChanged)="onModelChanged($event)"
         (activeModelChanged)="onActiveModelChanged($event)">
       </ki-models-table>
@@ -213,7 +215,7 @@ export interface KiModelsPageConfig {
     <section class="ki-card">
       <ki-failover-analytics
         [labels]="config.failoverAnalyticsLabels"
-        [pageSize]="config.analyticsPageSize ?? 25">
+        [pageSize]="config.analyticsPageSize ?? 10">
       </ki-failover-analytics>
     </section>
 
@@ -259,6 +261,15 @@ export class ModelsPageComponent {
   @Input() supermodelPools?: string[];
   @Input() supermodelRoles?: string[];
   @Input() supermodelLabels?: any;
+
+  /**
+   * Optionale Whitelist sichtbarer Kategorien/Cascaden — wird an
+   * `<ki-models-table>` (visibleCategories) und `<ki-cascades-view>`
+   * (visibleCascades) weitergereicht. `null` (Default) = alle zeigen
+   * (EduPro). Der Switcher berechnet die Liste aus Pool + Supermodell-Zustand:
+   * AUS → nur Pool-Kategorie, AN → nur Rollen-Kategorien des aktiven Pools.
+   */
+  @Input() visibleCategories: string[] | null = null;
 
   // ── Re-emitted outputs ─────────────────────────────────────────────
   @Output() modelChanged = new EventEmitter<AiModel | null>();
