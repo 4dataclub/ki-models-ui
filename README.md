@@ -569,6 +569,12 @@ Switcher in `/api/*`.
 | POST   | `{base}/api-keys/setting/{key}`             | Key setzen (`{value}`)                 |
 | GET    | `{base}/cascade-config`                     | Cooldown-Override-State                |
 | PUT    | `{base}/cascade-config`                     | Cooldown-Override setzen               |
+| GET    | `{base}/provider-servers`                   | Inferenz-Server-Liste (v0.15.0)        |
+| PUT    | `{base}/provider-servers/{name}`            | Server anlegen/ändern (v0.15.0)        |
+| DELETE | `{base}/provider-servers/{name}`            | Server löschen (Default nicht löschbar)|
+| GET    | `{base}/settings`                           | App-Settings (`AppSetting[]`, v0.17.0) |
+| POST   | `{base}/settings/{key}`                     | Setting setzen (`{value}`, v0.17.0)    |
+| GET    | `{base}/stats/calls`                        | Delegations-Calls (`DelegationCall[]`, v0.17.0) |
 
 Detaillierte Schemas: siehe TypeScript-Interfaces in
 [`projects/ki-models-ui/src/lib/models/`](projects/ki-models-ui/src/lib/models/).
