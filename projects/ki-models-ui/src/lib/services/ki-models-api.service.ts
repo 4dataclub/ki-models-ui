@@ -12,6 +12,8 @@ import { QualityStatRow } from '../models/quality';
 import { PerformanceRow } from '../models/performance';
 import { CooldownRow } from '../models/cooldown';
 import { ProviderServer, ProviderServerUpsert } from '../models/provider-server';
+import { AppSetting } from '../models/app-setting';
+import { DelegationCall } from '../models/delegation-call';
 
 /**
  * Library-API-Service. Spricht alle KI-Modell-/API-Key-/Cascade-Endpoints
@@ -364,5 +366,23 @@ export class KiModelsApiService {
     return this.http.delete<{ ok: boolean }>(
       `${this.base}/provider-servers/${encodeURIComponent(name)}`,
     );
+  }
+
+  // ─── App-Settings + Delegation-Calls (v0.16.0) ───────────────────────────
+
+  getSettings(): Observable<AppSetting[]> {
+    return this.http.get<any>(`${this.base}/settings`).pipe(
+      map((r): AppSetting[] => Array.isArray(r)
+        ? r.map(x => ({ key: x.key ?? x.settingKey, value: String(x.value ?? '') }))
+        : []),
+    );
+  }
+
+  setSetting(key: string, value: string): Observable<{ ok: boolean }> {
+    return this.http.post<{ ok: boolean }>(`${this.base}/settings/${encodeURIComponent(key)}`, { value });
+  }
+
+  getDelegationCalls(): Observable<DelegationCall[]> {
+    return this.http.get<DelegationCall[]>(`${this.base}/stats/calls`);
   }
 }
