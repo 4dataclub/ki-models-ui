@@ -4,7 +4,7 @@ import { KiModelsApiService } from '../services/ki-models-api.service';
 import { DelegationCall } from '../models/delegation-call';
 
 /**
- * v0.16.0 — Live-Browser-Watcher für Delegations-Calls.
+ * v0.17.0 — Live-Browser-Watcher für Delegations-Calls.
  *
  * Zeigt die letzten `maxRows` Delegations-Calls in einer kompakten Tabelle.
  * - Zeit (toLocaleTimeString), ✓/✗-Status (grün/rot), Provider:Modell,

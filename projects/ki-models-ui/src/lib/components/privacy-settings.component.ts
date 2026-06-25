@@ -1,11 +1,11 @@
-import { Component, Input, OnInit, inject, signal } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { AppSetting } from '../models/app-setting';
 
 /**
- * v0.16.0 — Datenschutz-Toggle für das „logPromptSnippet"-Setting.
+ * v0.17.0 — Datenschutz-Toggle für das „logPromptSnippet"-Setting.
  *
  * <h3>Was macht das?</h3>
  * Liest beim Mount `GET {base}/settings`, findet den Eintrag mit
@@ -127,7 +127,7 @@ import { AppSetting } from '../models/app-setting';
     .ki-feedback-err { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
   `],
 })
-export class PrivacySettingsComponent implements OnInit {
+export class PrivacySettingsComponent implements OnInit, OnDestroy {
   private readonly api = inject(KiModelsApiService);
 
   /** Titel oben — überschreibbar pro Konsument. */
@@ -160,6 +160,11 @@ export class PrivacySettingsComponent implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  ngOnDestroy(): void {
+    if (this.savedTimer) { clearTimeout(this.savedTimer); this.savedTimer = null; }
+    if (this.errorTimer) { clearTimeout(this.errorTimer); this.errorTimer = null; }
   }
 
   onToggle(event: Event): void {

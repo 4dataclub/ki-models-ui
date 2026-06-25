@@ -368,7 +368,7 @@ export class KiModelsApiService {
     );
   }
 
-  // ─── App-Settings + Delegation-Calls (v0.16.0) ───────────────────────────
+  // ─── App-Settings + Delegation-Calls (v0.17.0) ───────────────────────────
 
   getSettings(): Observable<AppSetting[]> {
     return this.http.get<any>(`${this.base}/settings`).pipe(
