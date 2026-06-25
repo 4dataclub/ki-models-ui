@@ -311,6 +311,19 @@ export class SupermodelMatrixComponent implements OnInit {
   }
 
   /**
+   * Öffentlicher Refresh — vom Host (z. B. <ki-models-page>) nach Pool-Wechsel
+   * aufgerufen. Das Backend filtert die Modell-Liste nach aktivem Pool, daher
+   * muss die Matrix neu laden wenn sich der Pool ändert — sonst zeigt sie die
+   * (leeren) Zellen des alten Pools.
+   */
+  reload(): void {
+    this.loadModels();
+    if (!this.activePool) {
+      this.loadDerivedPool();
+    }
+  }
+
+  /**
    * Load all models and group them by compound category (role-pool).
    * Includes disabled models — they appear greyed out in the matrix.
    * On error: graceful empty ({}).

@@ -261,6 +261,7 @@ export class ModelsPageComponent {
   // ── ViewChild references for internal wiring ───────────────────────
   @ViewChild(ModelsTableComponent) modelsTable?: ModelsTableComponent;
   @ViewChild(CascadesViewComponent) cascadesView?: CascadesViewComponent;
+  @ViewChild(SupermodelMatrixComponent) supermodelMatrix?: SupermodelMatrixComponent;
 
   // ── Internal event handlers ────────────────────────────────────────
 
@@ -295,5 +296,6 @@ export class ModelsPageComponent {
   reload(): void {
     this.modelsTable?.reload();
     this.cascadesView?.reload();
+    this.supermodelMatrix?.reload();
   }
 }
