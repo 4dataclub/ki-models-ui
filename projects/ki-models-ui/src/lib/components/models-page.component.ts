@@ -9,16 +9,16 @@ import { CommonModule } from '@angular/common';
 
 import { AiModel } from '../models/ai-model';
 import {
-  CascadeCooldownLabels,
   CascadesViewLabels,
   FailoverChainLabels,
   ModelsTableLabels,
   AddModelFormLabels,
   ApiKeysSectionLabels,
   ProviderServersLabels,
+  CallOverviewLabels,
+  FailoverAnalyticsLabels,
 } from '../models/labels';
 
-import { CascadeCooldownComponent } from './cascade-cooldown.component';
 import { CascadesViewComponent } from './cascades-view.component';
 import { ModelsTableComponent } from './models-table.component';
 import { AddModelFormComponent } from './add-model-form.component';
@@ -29,12 +29,12 @@ import { ProviderServersComponent } from './provider-servers.component';
 import { ModelsQualityStatsComponent } from './models-quality-stats.component';
 import { ModelsPerformanceComponent } from './models-performance.component';
 import { ModelsCooldownStateComponent } from './models-cooldown-state.component';
-import { RoutingDecisionsComponent } from './routing-decisions.component';
+import { CallOverviewComponent } from './call-overview.component';
+import { FailoverAnalyticsComponent } from './failover-analytics.component';
 import { DelegationLiveComponent } from './delegation-live.component';
 
 /** Optional config bundle — every field is optional; bare mount renders with defaults. */
 export interface KiModelsPageConfig {
-  cascadeCooldownLabels?: Partial<CascadeCooldownLabels>;
   cascadesViewLabels?: Partial<CascadesViewLabels>;
   cascadeChainLabels?: Partial<FailoverChainLabels>;
   cascadeHints?: Record<string, string>;
@@ -66,6 +66,10 @@ export interface KiModelsPageConfig {
   delegationSubtitle?: string;
   delegationAutoRefreshSec?: number;
   delegationMaxRows?: number;
+  callOverviewLabels?: Partial<CallOverviewLabels>;
+  failoverAnalyticsLabels?: Partial<FailoverAnalyticsLabels>;
+  analyticsPageSize?: number;
+  analyticsCostPerMillionTokens?: number;
 }
 
 /**
@@ -75,19 +79,18 @@ export interface KiModelsPageConfig {
  * `<ki-models-page></ki-models-page>` works with EduPro defaults.
  *
  * Canonical order:
- * Verwaltung: cascade-cooldown → cascades-view → models-table →
+ * Verwaltung: cascades-view → models-table →
  *             add-model-form → api-keys-section → privacy-settings
  * Supermodell: supermodel-matrix
  * Statistiken: provider-servers → models-quality-stats →
  *              models-performance → models-cooldown-state →
- *              routing-decisions → delegation-live
+ *              call-overview → failover-analytics → delegation-live
  */
 @Component({
   selector: 'ki-models-page',
   standalone: true,
   imports: [
     CommonModule,
-    CascadeCooldownComponent,
     CascadesViewComponent,
     ModelsTableComponent,
     AddModelFormComponent,
@@ -98,17 +101,12 @@ export interface KiModelsPageConfig {
     ModelsQualityStatsComponent,
     ModelsPerformanceComponent,
     ModelsCooldownStateComponent,
-    RoutingDecisionsComponent,
+    CallOverviewComponent,
+    FailoverAnalyticsComponent,
     DelegationLiveComponent,
   ],
   template: `
     <!-- ── Verwaltung ─────────────────────────────────────────────────── -->
-
-    <section class="ki-card">
-      <ki-cascade-cooldown
-        [labels]="config.cascadeCooldownLabels">
-      </ki-cascade-cooldown>
-    </section>
 
     <section class="ki-card">
       <ki-cascades-view
@@ -206,7 +204,17 @@ export interface KiModelsPageConfig {
     </section>
 
     <section class="ki-card">
-      <ki-routing-decisions></ki-routing-decisions>
+      <ki-call-overview
+        [labels]="config.callOverviewLabels"
+        [costPerMillionTokens]="config.analyticsCostPerMillionTokens ?? 2.0">
+      </ki-call-overview>
+    </section>
+
+    <section class="ki-card">
+      <ki-failover-analytics
+        [labels]="config.failoverAnalyticsLabels"
+        [pageSize]="config.analyticsPageSize ?? 25">
+      </ki-failover-analytics>
     </section>
 
     <section class="ki-card">

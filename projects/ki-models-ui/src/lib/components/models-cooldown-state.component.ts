@@ -1,7 +1,8 @@
-import { Component, Input, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { CooldownRow } from '../models/cooldown';
+import { KiPagerComponent, paginate } from './ki-pager.component';
 
 /**
  * v0.14.0 — Cooldown + Auto-Disable State pro Modell.
@@ -19,7 +20,7 @@ import { CooldownRow } from '../models/cooldown';
 @Component({
   selector: 'ki-models-cooldown-state',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, KiPagerComponent],
   template: `
     <div class="ki-cd">
       <div class="ki-header">
@@ -46,7 +47,7 @@ import { CooldownRow } from '../models/cooldown';
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let r of rows()"
+          <tr *ngFor="let r of pageRows()"
               [class.ki-row-killed]="r.autoDisabled"
               [class.ki-row-cooldown]="!r.autoDisabled && liveRemaining(r) > 0">
             <td class="ki-icon">
@@ -76,6 +77,13 @@ import { CooldownRow } from '../models/cooldown';
           </tr>
         </tbody>
       </table>
+
+      <ki-pager
+        [total]="rows().length"
+        [page]="page()"
+        [pageSize]="pageSize"
+        (pageChange)="page.set($event)">
+      </ki-pager>
 
       <p class="ki-foot ki-tiny ki-muted">
         Auto-Refresh alle {{ autoRefreshSec }}s. Cooldown-Zähler lebt im
@@ -137,8 +145,14 @@ export class ModelsCooldownStateComponent implements OnInit, OnDestroy {
   /** Auto-Refresh-Intervall in Sekunden. Default 30s. 0 disabled. */
   @Input() autoRefreshSec = 30;
 
+  /** Seitengröße. Pager nur sichtbar wenn mehr Zeilen. Kein Page-Reset beim
+   *  Auto-Refresh — paginate() klemmt defensiv. */
+  @Input() pageSize = 25;
+
   readonly rows = signal<CooldownRow[]>([]);
   readonly loading = signal(true);
+  readonly page = signal(0);
+  readonly pageRows = computed(() => paginate(this.rows(), this.page(), this.pageSize));
 
   /** v0.15.0 — 1s-Tick, lässt den Cooldown-Zähler zwischen den Reloads sichtbar
    *  runterlaufen. `fetchedAt` = Zeitpunkt des letzten Backend-Werts. */

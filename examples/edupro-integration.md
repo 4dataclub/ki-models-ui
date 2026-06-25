@@ -1,4 +1,4 @@
-# EduPro-Integration — exakte Consumer-Anleitung (v0.17.0)
+# EduPro-Integration — exakte Consumer-Anleitung (v0.18.0)
 
 > **Ziel:** Eine andere Claude-Session kann EduPro so aufsetzen, dass die
 > KI-Modell-Verwaltung **exakt genauso läuft wie im Switcher** — ohne Kontext
@@ -17,11 +17,29 @@ Die Library liefert **eine einzige Komponente** `<ki-models-page>`, die ALLE
 KI-Sektionen in kanonischer Reihenfolge rendert:
 
 ```
-Verwaltung:   cascade-cooldown → cascades-view → models-table →
+Verwaltung:   cascades-view → models-table →
               add-model-form → api-keys-section → privacy-settings
 Supermodell:  supermodel-matrix   (nur sichtbar wenn supermodelOn = true)
 Statistiken:  provider-servers → models-quality-stats → models-performance →
-              models-cooldown-state → routing-decisions → delegation-live
+              models-cooldown-state → call-overview → failover-analytics →
+              delegation-live
+```
+
+> **Seit v0.18.0:** Das Semantic-Routing-Panel (`<ki-routing-decisions>`) und
+> das Cascade-Cooldown-Override-Panel (`<ki-cascade-cooldown>`) werden vom
+> Composer **nicht mehr gerendert**. Beide Komponenten bleiben exportiert
+> (Opt-in für Fremdnutzer), aber `<ki-models-page>` zeigt sie nicht. Die
+> Routing-**Funktion** (`SemanticCategoryRouter`) läuft im Backend unverändert
+> headless weiter — nur die Anzeige ist weg.
+>
+> **Neu in v0.18.0:** Zwei geteilte Analytics-Panels — `<ki-call-overview>`
+> (Erfolgs-Trend 30 Tage + KI-Calls-Totals + geschätzte Kosten) und
+> `<ki-failover-analytics>` (Failover-out/Provider als Donut + Provider×Grund-
+> Tabelle, paginiert). Lange Tabellen haben jetzt durchgängig einen Pager
+> (`pageSize` Default 25). **EduPro-Domänen-Charts (nach Dienst / nach
+> Zielsprache) sind NICHT im Composer** — die bleiben EduPro-eigen, da sie auf
+> `service`/`lang` im Call-Log basieren, was die Switcher/Supermodell-Welt
+> (Routing nach `category`) nicht loggt.
 ```
 
 **Der Consumer (EduPro) stellt selbst bereit:**
@@ -48,11 +66,11 @@ Registry):
 # In ki-models-ui: Library bauen + packen
 npx ng build ki-models-ui
 cd dist/ki-models-ui && npm pack
-# erzeugt: 4dataclub-ki-models-ui-0.17.0.tgz
+# erzeugt: 4dataclub-ki-models-ui-0.18.0.tgz
 
 # In EduPro:
 cd <edupro>/angular-frontend
-npm i /pfad/zu/ki-models-ui/dist/ki-models-ui/4dataclub-ki-models-ui-0.17.0.tgz
+npm i /pfad/zu/ki-models-ui/dist/ki-models-ui/4dataclub-ki-models-ui-0.18.0.tgz
 ```
 
 Peer-Dependencies: Angular 17 (`@angular/core`, `@angular/common`,
@@ -213,7 +231,7 @@ export class KiAdminComponent {
 
 | Feld | Zweck |
 |---|---|
-| `cascadeCooldownLabels`, `cascadesViewLabels`, `cascadeChainLabels`, `modelsTableLabels`, `addModelFormLabels`, `apiKeysSectionLabels`, `providerServersLabels` | Label-Overrides pro Sektion (`Partial<…Labels>`) |
+| `cascadesViewLabels`, `cascadeChainLabels`, `modelsTableLabels`, `addModelFormLabels`, `apiKeysSectionLabels`, `providerServersLabels`, `callOverviewLabels`, `failoverAnalyticsLabels` | Label-Overrides pro Sektion (`Partial<…Labels>`) |
 | `cascadeHints` / `categoryHints` | `Record<name, hint>` — Untertitel pro Cascade/Kategorie |
 | `cascadeProviderOptions` | `{value,label}[]` — Provider-Dropdown der Cascades-View |
 | `categoryTitles` | `Record<name, title>` — Anzeige-Titel (sonst humanized) |
@@ -225,6 +243,8 @@ export class KiAdminComponent {
 | `qualityTitle/Subtitle`, `performanceTitle/Subtitle`, `cooldownTitle/Subtitle`, `privacyTitle/Subtitle`, `delegationTitle/Subtitle` | Überschriften der Statistik-Sektionen |
 | `costMapping`, `costCurrency`, `usdToEur` | Kosten-Anzeige der Performance-Sektion |
 | `cooldownAutoRefreshSec`, `delegationAutoRefreshSec`, `delegationMaxRows` | Refresh/Limits |
+| `analyticsPageSize` | `number` — Pager-Schwelle der Failover-Tabelle (Default 25) |
+| `analyticsCostPerMillionTokens` | `number` — €/1M-Token für die Kosten-Schätzung in `call-overview` (Default 2.0) |
 
 ---
 
@@ -273,6 +293,9 @@ Delegations-Live).
 | GET    | `{base}/settings` | App-Settings `AppSetting[]` *(v0.17.0)* |
 | POST   | `{base}/settings/{key}` | Setting setzen (`{value}`) *(v0.17.0)* |
 | GET    | `{base}/stats/calls` | Delegations-Calls `DelegationCall[]` *(v0.17.0)* |
+| GET    | `{base}/stats/trend?days=30` | Erfolgs-Trend `TrendPoint[]` (`{date,total,success,failed}`) *(v0.18.0)* |
+| GET    | `{base}/stats/totals` | KI-Calls-Totals `StatsTotals` (`{last24h,last7d,last30d,success30d,failed30d,outputChars30d}`) *(v0.18.0)* |
+| GET    | `{base}/stats/failover-breakdown` | Failover-Aufschlüsselung `FailoverBreakdown` (`{byProvider,byProviderReason,byReason}`) *(v0.18.0)* |
 
 **Graceful fallback:** Fehlt ein Statistik-/Settings-Endpoint (Backend < Feature),
 zeigt die jeweilige Sektion einen leeren/neutralen Zustand statt zu crashen.
@@ -300,17 +323,24 @@ docker compose up -d --force-recreate --no-deps frontend
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:<port>/api/admin/ai-models
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:<port>/api/admin/settings
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:<port>/api/admin/stats/calls
+# v0.18.0-Analytics:
+curl -s -o /dev/null -w "%{http_code}\n" "http://localhost:<port>/api/admin/stats/trend?days=30"
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:<port>/api/admin/stats/totals
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:<port>/api/admin/stats/failover-breakdown
 ```
 
 Browser-Test (Inkognito): Admin → KI-Modelle-Tab → alle Sektionen da, CRUD +
-Toggle + Test + Reorder + Cooldown-Tri-State + Keys + Datenschutz-Toggle
-funktionieren. Supermodell-Matrix bleibt aus, solange `supermodelOn=false`.
+Toggle + Test + Reorder + Keys + Datenschutz-Toggle funktionieren; die
+Analytics-Panels (Erfolgs-Trend + Totals + Failover-Donut) zeigen Daten oder
+einen sauberen Leerzustand; Pager nur bei langen Tabellen sichtbar. Kein
+Semantic-Routing-Panel, kein Cascade-Cooldown-Override-Panel mehr.
+Supermodell-Matrix bleibt aus, solange `supermodelOn=false`.
 
 ---
 
 ## 8. Checkliste für die EduPro-Session (Kurzform)
 
-- [ ] `4dataclub-ki-models-ui-0.17.0.tgz` gebaut + in EduPro installiert
+- [ ] `4dataclub-ki-models-ui-0.18.0.tgz` gebaut + in EduPro installiert
 - [ ] `provideHttpClient()` + `{ provide: KI_MODELS_API_BASE, useValue: '/api/admin' }`
 - [ ] Inline-KI-Sektion durch ein einziges `<ki-models-page [config]="…">` ersetzt
 - [ ] Deutsche Labels + `categoryOrder` + `categoryTitles` (aus `/api/categories`) gesetzt

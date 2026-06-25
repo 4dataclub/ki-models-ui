@@ -21,6 +21,9 @@ export * from './lib/models/provider-server';
 export * from './lib/models/labels';
 export * from './lib/models/app-setting';
 export * from './lib/models/delegation-call';
+export * from './lib/models/stats-trend';
+export * from './lib/models/stats-totals';
+export * from './lib/models/stats-failover';
 
 // ─── Service + InjectionToken ────────────────────────────────────────────
 export * from './lib/services/ki-models-api.service';
@@ -42,4 +45,9 @@ export * from './lib/components/provider-servers.component';
 export * from './lib/components/privacy-settings.component';
 export * from './lib/components/supermodel-matrix.component';
 export * from './lib/components/delegation-live.component';
+export * from './lib/components/ki-pager.component';
+export * from './lib/components/ki-area-chart.component';
+export * from './lib/components/ki-donut-chart.component';
+export * from './lib/components/call-overview.component';
+export * from './lib/components/failover-analytics.component';
 export * from './lib/components/models-page.component';

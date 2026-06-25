@@ -4,6 +4,7 @@ import { KiModelsApiService } from '../services/ki-models-api.service';
 import { AiModel } from '../models/ai-model';
 import { ProviderServer } from '../models/provider-server';
 import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
+import { KiPagerComponent, paginate } from './ki-pager.component';
 
 /**
  * Tabelle aller AI-Modelle in der Cascade-Reihenfolge.
@@ -25,7 +26,7 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
 @Component({
   selector: 'ki-models-table',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, KiPagerComponent],
   template: `
     <div class="ki-models-table">
       <div class="ki-models-table-header">
@@ -64,9 +65,9 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let m of modelsByCategory()[cat]; let i = index"
+                <tr *ngFor="let m of pagedModels(cat); let i = index"
                     [class.ki-row-auto-disabled]="m.autoDisabled">
-                  <td class="ki-mono ki-muted">{{ i + 1 }}</td>
+                  <td class="ki-mono ki-muted">{{ catPage(cat) * pageSize + i + 1 }}</td>
                   <td class="ki-mono ki-provider">{{ m.provider }}</td>
                   <td class="ki-mono">
                     <strong>{{ m.modelId }}</strong>
@@ -123,11 +124,11 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
                     <ng-template #noServer><span class="ki-muted ki-tiny">—</span></ng-template>
                   </td>
                   <td class="ki-right ki-actions">
-                    <button (click)="moveInCategory(cat, i, -1)"
-                            [disabled]="i === 0"
+                    <button (click)="moveInCategory(cat, catPage(cat) * pageSize + i, -1)"
+                            [disabled]="catPage(cat) * pageSize + i === 0"
                             class="ki-btn-icon">↑</button>
-                    <button (click)="moveInCategory(cat, i, 1)"
-                            [disabled]="i === modelsByCategory()[cat].length - 1"
+                    <button (click)="moveInCategory(cat, catPage(cat) * pageSize + i, 1)"
+                            [disabled]="catPage(cat) * pageSize + i === modelsByCategory()[cat].length - 1"
                             class="ki-btn-icon">↓</button>
                     <button (click)="test(m)" class="ki-btn-secondary">{{ L.btnTest }}</button>
                     <span *ngIf="showActiveAction && isActiveModel(m)" class="ki-badge ki-badge-active">{{ L.activeBadge }}</span>
@@ -142,6 +143,13 @@ import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
                 </tr>
               </tbody>
             </table>
+
+            <ki-pager
+              [total]="modelsByCategory()[cat].length"
+              [page]="catPage(cat)"
+              [pageSize]="pageSize"
+              (pageChange)="setCatPage(cat, $event)">
+            </ki-pager>
           </div>
         </section>
       </div>
@@ -308,10 +316,15 @@ export class ModelsTableComponent {
    */
   @Input() keylessProviders: string[] = [];
 
+  /** Seitengröße pro Kategorie-Section. Pager nur sichtbar wenn mehr Zeilen. */
+  @Input() pageSize = 25;
+
   private readonly api = inject(KiModelsApiService);
 
   readonly loading = signal(true);
   readonly models = signal<AiModel[]>([]);
+  /** Aktuelle Seite je Kategorie (0-basiert). Default 0. */
+  readonly pageByCategory = signal<Record<string, number>>({});
   readonly testResult = signal<Record<number, { ok?: boolean; latencyMs?: number; error?: string; pending?: boolean; skipped?: boolean }>>({});
   /** v0.15.0 — benannte Inferenz-Server für das pro-Modell-Dropdown. Leer wenn
    *  Backend < 0.8.0 (Endpoint 404) → Dropdown zeigt nur „Default". */
@@ -398,6 +411,7 @@ export class ModelsTableComponent {
 
   reload(): void {
     this.loading.set(true);
+    this.pageByCategory.set({});
     this.api.listModels().subscribe({
       next: (list) => {
         this.models.set(list);
@@ -405,6 +419,21 @@ export class ModelsTableComponent {
       },
       error: () => this.loading.set(false),
     });
+  }
+
+  /** Aktuelle Seite einer Kategorie (0-basiert, Default 0). */
+  catPage(cat: string): number {
+    return this.pageByCategory()[cat] ?? 0;
+  }
+
+  /** Setzt die Seite einer Kategorie (vom Pager-Event). */
+  setCatPage(cat: string, page: number): void {
+    this.pageByCategory.update((m) => ({ ...m, [cat]: page }));
+  }
+
+  /** Aktuelle Seiten-Slice einer Kategorie. */
+  pagedModels(cat: string): AiModel[] {
+    return paginate(this.modelsByCategory()[cat] ?? [], this.catPage(cat), this.pageSize);
   }
 
   /** v0.15.0 — lädt die benannten Server fürs Server-Dropdown. Backend < 0.8.0

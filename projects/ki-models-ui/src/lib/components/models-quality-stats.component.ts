@@ -1,8 +1,9 @@
-import { Component, Input, OnInit, inject, signal } from '@angular/core';
+import { Component, Input, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { QualityStatRow } from '../models/quality';
+import { KiPagerComponent, paginate } from './ki-pager.component';
 
 /**
  * v0.7.1 / Library v0.12.0 — Quality-Bewertung pro Modell aus den letzten
@@ -26,7 +27,7 @@ import { QualityStatRow } from '../models/quality';
 @Component({
   selector: 'ki-models-quality-stats',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, KiPagerComponent],
   template: `
     <div class="ki-quality-stats">
       <div class="ki-header">
@@ -97,7 +98,7 @@ import { QualityStatRow } from '../models/quality';
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let r of rows()"
+          <tr *ngFor="let r of pageRows()"
               [class.ki-row-kill]="r.kill"
               [class.ki-row-weak]="r.tier === 'weak'">
             <td class="ki-tier-icon" [class]="'ki-tier-' + r.tier">{{ r.tierIcon }}</td>
@@ -119,6 +120,13 @@ import { QualityStatRow } from '../models/quality';
           </tr>
         </tbody>
       </table>
+
+      <ki-pager
+        [total]="rows().length"
+        [page]="page()"
+        [pageSize]="pageSize"
+        (pageChange)="page.set($event)">
+      </ki-pager>
     </div>
   `,
   styles: [`
@@ -199,8 +207,13 @@ export class ModelsQualityStatsComponent implements OnInit {
 
   sortBy: 'worst-first' | 'best-first' | 'calls-desc' = 'worst-first';
 
+  /** Seitengröße der Tabelle. Pager nur sichtbar wenn mehr Zeilen. */
+  @Input() pageSize = 25;
+
   readonly rows = signal<QualityStatRow[]>([]);
   readonly loading = signal(true);
+  readonly page = signal(0);
+  readonly pageRows = computed(() => paginate(this.rows(), this.page(), this.pageSize));
 
   // v0.12.1: Auto-Disable-Trigger
   readonly running = signal(false);
@@ -235,6 +248,7 @@ export class ModelsQualityStatsComponent implements OnInit {
 
   reload(): void {
     this.loading.set(true);
+    this.page.set(0);
     this.api.getQualityStats(this.sortBy).subscribe({
       next: (rows) => {
         this.rows.set(Array.isArray(rows) ? rows : []);

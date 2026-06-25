@@ -1,9 +1,10 @@
-import { Component, EventEmitter, Input, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { ProviderServer } from '../models/provider-server';
 import { ProviderServersLabels, PROVIDER_SERVERS_LABELS_EN } from '../models/labels';
+import { KiPagerComponent, paginate } from './ki-pager.component';
 
 /**
  * v0.15.0 — Verwaltung benannter Inferenz-Server (llm-cascade ≥ 0.8.0).
@@ -22,7 +23,7 @@ import { ProviderServersLabels, PROVIDER_SERVERS_LABELS_EN } from '../models/lab
 @Component({
   selector: 'ki-provider-servers',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, KiPagerComponent],
   template: `
     <section class="ki-provider-servers">
       <header class="ki-ps-header">
@@ -43,7 +44,7 @@ import { ProviderServersLabels, PROVIDER_SERVERS_LABELS_EN } from '../models/lab
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let s of servers()">
+            <tr *ngFor="let s of pageServers()">
               <td class="ki-ps-mono"><strong>{{ s.name }}</strong>
                 <div *ngIf="s.description" class="ki-ps-tiny ki-ps-muted">{{ s.description }}</div>
               </td>
@@ -62,6 +63,13 @@ import { ProviderServersLabels, PROVIDER_SERVERS_LABELS_EN } from '../models/lab
             </tr>
           </tbody>
         </table>
+
+        <ki-pager
+          [total]="servers().length"
+          [page]="page()"
+          [pageSize]="pageSize"
+          (pageChange)="page.set($event)">
+        </ki-pager>
       </div>
 
       <!-- Add / Edit form -->
@@ -120,10 +128,15 @@ export class ProviderServersComponent {
 
   private readonly api = inject(KiModelsApiService);
 
+  /** Seitengröße der Server-Tabelle. Pager nur sichtbar wenn mehr Zeilen. */
+  @Input() pageSize = 25;
+
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly servers = signal<ProviderServer[]>([]);
   readonly error = signal<string | null>(null);
+  readonly page = signal(0);
+  readonly pageServers = computed(() => paginate(this.servers(), this.page(), this.pageSize));
   /** Name des aktuell editierten Servers; null = Add-Modus. */
   readonly editingName = signal<string | null>(null);
 
@@ -139,6 +152,7 @@ export class ProviderServersComponent {
 
   reload(): void {
     this.loading.set(true);
+    this.page.set(0);
     this.api.listProviderServers().subscribe({
       next: (list) => { this.servers.set(list ?? []); this.loading.set(false); },
       error: () => { this.servers.set([]); this.loading.set(false); },

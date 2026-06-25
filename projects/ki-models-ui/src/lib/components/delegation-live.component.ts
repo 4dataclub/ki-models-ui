@@ -1,7 +1,8 @@
-import { Component, Input, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { DelegationCall } from '../models/delegation-call';
+import { KiPagerComponent, paginate } from './ki-pager.component';
 
 /**
  * v0.17.0 — Live-Browser-Watcher für Delegations-Calls.
@@ -18,7 +19,7 @@ import { DelegationCall } from '../models/delegation-call';
 @Component({
   selector: 'ki-delegation-live',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, KiPagerComponent],
   template: `
     <div class="ki-dl">
       <div class="ki-header">
@@ -51,7 +52,7 @@ import { DelegationCall } from '../models/delegation-call';
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let r of rows()"
+          <tr *ngFor="let r of pageRows()"
               [class.ki-row-ok]="r.success"
               [class.ki-row-fail]="!r.success">
             <td class="ki-icon">
@@ -73,6 +74,13 @@ import { DelegationCall } from '../models/delegation-call';
           </tr>
         </tbody>
       </table>
+
+      <ki-pager
+        [total]="rows().length"
+        [page]="page()"
+        [pageSize]="pageSize"
+        (pageChange)="page.set($event)">
+      </ki-pager>
 
       <p class="ki-foot ki-tiny ki-muted">
         Auto-Refresh alle {{ autoRefreshSec }}s · max. {{ maxRows }} Einträge.
@@ -130,9 +138,16 @@ export class DelegationLiveComponent implements OnInit, OnDestroy {
   /** Maximale Anzahl angezeigter Zeilen. */
   @Input() maxRows = 50;
 
+  /** Seitengröße. Pager nur sichtbar wenn mehr Zeilen geladen sind. */
+  @Input() pageSize = 25;
+
   readonly rows = signal<DelegationCall[]>([]);
   readonly loading = signal(true);
   readonly error = signal(false);
+  readonly page = signal(0);
+  // Kein Page-Reset beim Auto-Refresh — paginate() klemmt die Seite defensiv,
+  // sonst würde die Tabelle alle 5s auf Seite 0 zurückspringen.
+  readonly pageRows = computed(() => paginate(this.rows(), this.page(), this.pageSize));
 
   private timer: ReturnType<typeof setInterval> | null = null;
 

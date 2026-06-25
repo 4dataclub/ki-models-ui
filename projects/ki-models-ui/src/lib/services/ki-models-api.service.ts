@@ -14,6 +14,9 @@ import { CooldownRow } from '../models/cooldown';
 import { ProviderServer, ProviderServerUpsert } from '../models/provider-server';
 import { AppSetting } from '../models/app-setting';
 import { DelegationCall } from '../models/delegation-call';
+import { TrendPoint } from '../models/stats-trend';
+import { StatsTotals } from '../models/stats-totals';
+import { FailoverBreakdown } from '../models/stats-failover';
 
 /**
  * Library-API-Service. Spricht alle KI-Modell-/API-Key-/Cascade-Endpoints
@@ -384,5 +387,43 @@ export class KiModelsApiService {
 
   getDelegationCalls(): Observable<DelegationCall[]> {
     return this.http.get<DelegationCall[]>(`${this.base}/stats/calls`);
+  }
+
+  // ─── Shared-Analytics (v0.18.0 — cascade ≥ 0.9 / Switcher-Proxy) ─────────
+
+  /**
+   * Erfolgs-Trend pro Tag (Calls total/success/failed) der letzten `days`
+   * Tage. Speist den Area-Chart in `<ki-call-overview>`. Bei Backend ohne
+   * Endpoint liefert der Proxy ein leeres Array.
+   */
+  getStatsTrend(days = 30): Observable<TrendPoint[]> {
+    return this.http.get<TrendPoint[]>(`${this.base}/stats/trend?days=${days}`).pipe(
+      map((r) => Array.isArray(r) ? r : []),
+    );
+  }
+
+  /**
+   * KI-Calls-Totals (24h/7d/30d + Erfolg/Fehlschlag + Output-Chars).
+   * Speist die Übersichts-Cards + Kosten-Schätzung in `<ki-call-overview>`.
+   */
+  getStatsTotals(): Observable<StatsTotals> {
+    return this.http.get<StatsTotals>(`${this.base}/stats/totals`).pipe(
+      map((r) => (r && typeof r === 'object') ? r : {}),
+    );
+  }
+
+  /**
+   * Failover-Aufschlüsselung (Provider/Grund, 30 Tage). Speist Donut +
+   * Tabelle in `<ki-failover-analytics>`. Leer-Objekt-Felder werden auf
+   * leere Arrays normalisiert.
+   */
+  getStatsFailoverBreakdown(): Observable<FailoverBreakdown> {
+    return this.http.get<any>(`${this.base}/stats/failover-breakdown`).pipe(
+      map((r): FailoverBreakdown => ({
+        byProvider: Array.isArray(r?.byProvider) ? r.byProvider : [],
+        byProviderReason: Array.isArray(r?.byProviderReason) ? r.byProviderReason : [],
+        byReason: Array.isArray(r?.byReason) ? r.byReason : [],
+      })),
+    );
   }
 }

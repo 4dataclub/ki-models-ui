@@ -1,8 +1,9 @@
-import { Component, Input, OnInit, inject, signal } from '@angular/core';
+import { Component, Input, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { KiModelsApiService } from '../services/ki-models-api.service';
 import { PerformanceRow } from '../models/performance';
+import { KiPagerComponent, paginate } from './ki-pager.component';
 
 /**
  * v0.14.0 — Performance-Tabelle pro Modell der letzten 30 Tage.
@@ -29,7 +30,7 @@ import { PerformanceRow } from '../models/performance';
 @Component({
   selector: 'ki-models-performance',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, KiPagerComponent],
   template: `
     <div class="ki-perf">
       <div class="ki-header">
@@ -64,7 +65,7 @@ import { PerformanceRow } from '../models/performance';
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let r of rows()">
+          <tr *ngFor="let r of pageRows()">
             <td class="ki-mono">
               <span class="ki-provider">{{ r.provider }}</span>
               <strong>{{ r.model }}</strong>
@@ -82,6 +83,13 @@ import { PerformanceRow } from '../models/performance';
           </tr>
         </tbody>
       </table>
+
+      <ki-pager
+        [total]="rows().length"
+        [page]="page()"
+        [pageSize]="pageSize"
+        (pageChange)="page.set($event)">
+      </ki-pager>
 
       <p *ngIf="hasCost" class="ki-cost-note">
         Cost geschätzt aus output_chars × {{ costNote }}.
@@ -153,9 +161,14 @@ export class ModelsPerformanceComponent implements OnInit {
   /** USD → EUR Konvertierungs-Faktor (Default Stand 2026). */
   @Input() usdToEur: number = 0.92;
 
+  /** Seitengröße der Tabelle. Pager nur sichtbar wenn mehr Zeilen. */
+  @Input() pageSize = 25;
+
   sortBy: 'calls-desc' | 'success-desc' | 'chars-desc' = 'calls-desc';
   readonly rows = signal<PerformanceRow[]>([]);
   readonly loading = signal(true);
+  readonly page = signal(0);
+  readonly pageRows = computed(() => paginate(this.rows(), this.page(), this.pageSize));
 
   get hasCost(): boolean {
     return !!this.costMapping && Object.keys(this.costMapping).length > 0;
@@ -173,6 +186,7 @@ export class ModelsPerformanceComponent implements OnInit {
 
   reload(): void {
     this.loading.set(true);
+    this.page.set(0);
     this.api.getPerformance(this.sortBy).subscribe({
       next: (rows) => {
         this.rows.set(Array.isArray(rows) ? rows : []);
