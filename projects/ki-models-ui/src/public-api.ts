@@ -19,6 +19,8 @@ export * from './lib/models/performance';
 export * from './lib/models/cooldown';
 export * from './lib/models/provider-server';
 export * from './lib/models/labels';
+export * from './lib/models/app-setting';
+export * from './lib/models/delegation-call';
 
 // ─── Service + InjectionToken ────────────────────────────────────────────
 export * from './lib/services/ki-models-api.service';
@@ -37,3 +39,7 @@ export * from './lib/components/cascade-mode-panel.component';
 export * from './lib/components/models-performance.component';
 export * from './lib/components/models-cooldown-state.component';
 export * from './lib/components/provider-servers.component';
+export * from './lib/components/privacy-settings.component';
+export * from './lib/components/supermodel-matrix.component';
+export * from './lib/components/delegation-live.component';
+export * from './lib/components/models-page.component';
