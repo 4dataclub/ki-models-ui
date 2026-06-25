@@ -1,90 +1,64 @@
-# Switcher-Integration (Phase L.4)
+# Switcher-Integration — Referenz-Host (v0.17.0)
 
-Switcher ist aktuell Vanilla-JS + Tailwind-CDN. Phase L.4 migriert auf
-Angular 17 Standalone und importiert die Library. Skeleton-Schritte:
+Der Switcher ist die **Referenz-Implementierung** für `<ki-models-page>`.
+Wer EduPro (oder einen neuen Consumer) anbindet, schaut hierher und in die
+lebende Quelle:
 
-## 1. Angular-Workspace im Switcher-Repo
+> **Goldstandard-Datei:**
+> `claude-code-switcher/angular-frontend/src/app/app.component.ts`
 
-```bash
-cd ~/Downloads/ki-projekte/claude-switcher
-npx --yes @angular/cli@17 new angular-frontend --routing --style=css --standalone
-```
+Diese Datei zeigt den vollständigen, produktiven Einbau. Die generische
+Consumer-Anleitung steht in [`edupro-integration.md`](edupro-integration.md).
 
-## 2. Library installieren
+---
 
-```bash
-cd angular-frontend
-npm i @4dataclub/ki-models-ui
-# (Phase L.5 published auf Registry; erste Iteration via tarball)
-```
+## Was der Switcher konkret macht
 
-## 3. `app.config.ts`
+1. **API-Base:** `{ provide: KI_MODELS_API_BASE, useValue: '/api' }`
+   (Switcher-Backend direkt, kein `/admin`-Prefix). nginx im
+   `switcher-frontend`-Container proxy't `/api/*` → `switcher-backend:2000`.
 
-```typescript
-import { provideHttpClient } from '@angular/common/http';
-import { KI_MODELS_API_BASE } from '@4dataclub/ki-models-ui';
+2. **Ein einziges `<ki-models-page>`** rendert die komplette KI-Verwaltung —
+   identisch zu EduPro, keine Switcher-Sonderflocke mehr. Übergeben wird ein
+   `KiModelsPageConfig`-Getter mit deutschen Labels, der Pool/Compound-
+   Reihenfolge (`cascadeOrder`) und `keylessProviders: ['anthropic']`
+   (Anthropic via Max-OAuth braucht keinen `sk-ant`-Key).
 
-export const appConfig: ApplicationConfig = {
-  providers: [
-    provideHttpClient(),
-    { provide: KI_MODELS_API_BASE, useValue: '/api' },   // Switcher direkt, kein /admin
-  ],
-};
-```
+3. **Pool/Supermodell-Achse** wird per `[activePool]` / `[supermodelOn]` /
+   `[localOrchestratorPending]` hineingereicht. Der State kommt aus
+   `/api/status` + `/api/supermodel` und wird via SSE (`/api/events`,
+   Events `mode` + `supermodel`) live gespiegelt. Bei Pool-Wechsel ruft der
+   Host `modelsPage.reload()`.
 
-## 4. AppComponent — Library + Switcher-spezifische Components
+4. **Switcher-spezifisches Chrome drumherum** (NICHT in der Library, NICHT von
+   EduPro zu übernehmen):
+   - `<sw-status-bar>` — aktueller Provider/Modell/Quota
+   - `<sw-banner>` — Quota-Warnung + "Jetzt switchen"
+   - `<sw-mode-panel>` — Manuell vs. Auto-Failover + Pool-Toggle + Supermodell-Schalter
+   - Claude-Restart-Button
+   - `onSwitchToModel()` mappt cascade-`gemini` → switcher-`google` und ruft
+     `/api/switch` (schreibt `~/.claude/.switcher-restart`, Wrapper startet
+     Claude Code neu). **Das ist reine Switcher-Failover-Logik.**
 
-Switcher hat ZUSÄTZLICH:
+---
 
-- **Banner-Display** (Quota-Warnung über `~/.claude/.switcher-restart` Marker)
-- **Restart-Button** für Claude-CLI
-- **Modus-Panel** (Manual / Auto-Failover Chain-Editor) — gehört in Library (Phase L.2)
-
-```html
-<div class="container">
-  <!-- Switcher-only: Quota-Banner -->
-  <app-quota-banner></app-quota-banner>
-
-  <!-- Library: Cascade-Verwaltung -->
-  <ki-cascade-cooldown></ki-cascade-cooldown>
-  <ki-models-table
-    (activeModelChanged)="onActiveSelected($event)"
-  ></ki-models-table>
-  <ki-add-model-form (modelCreated)="reload()"></ki-add-model-form>
-  <ki-api-keys-section></ki-api-keys-section>
-
-  <!-- Switcher-only: Aktion -->
-  <app-restart-button></app-restart-button>
-</div>
-```
-
-```typescript
-import { AiModel, ModelsTableComponent, ...} from '@4dataclub/ki-models-ui';
-
-@Component({
-  /* ... */
-})
-export class AppComponent {
-  onActiveSelected(model: AiModel) {
-    // Switcher-spezifisch: HTTP-Call zum Switcher-Backend
-    // POST /api/switch  + Wrapper schreibt Restart-Marker
-    this.api.switchActive(model.provider, model.modelId).subscribe();
-  }
-}
-```
-
-## 5. nginx-Setup behalten
-
-`nginx.conf` (im `switcher-frontend`-Container) muss weiter `/api/*` zu
-`switcher-backend:2000` proxyen. Library-Calls gegen `/api/ai-models` etc.
-landen so beim Java-Backend (PR #7 hat die Routes hinzugefügt).
-
-## 6. Verifikation
+## Verifikation (Switcher)
 
 ```bash
-docker compose build switcher-frontend
-docker compose up -d --force-recreate --no-deps switcher-frontend
-curl http://localhost:2000/api/cascade-models   # Library spricht hier
+cd ~/claude-switcher
+docker compose build switcher-frontend switcher-backend
+docker compose up -d --force-recreate switcher-frontend switcher-backend
+
+# Backend-Vertrag (Base = /api):
+curl -s -o /dev/null -w "ai-models %{http_code}\n"  http://localhost:2000/api/ai-models
+curl -s -o /dev/null -w "settings %{http_code}\n"   http://localhost:2000/api/settings
+curl -s -o /dev/null -w "stats/calls %{http_code}\n" http://localhost:2000/api/stats/calls
 ```
 
-Plus Browser-Test in Incognito auf `http://localhost:2000`.
+Dann Browser auf `http://localhost:2000` (Inkognito): alle Sektionen,
+Pool-Toggle, Supermodell-Matrix (nur bei Schalter AN), Statistiken.
+
+> **Achtung Live-Test:** POST auf `/api/switch`, `/api/mode`, `/api/supermodel`
+> schreiben den Restart-Marker → der Wrapper killt + restartet die laufende
+> Claude-Code-Session. Diese Klicks gehören in die Hand des Nutzers, nicht in
+> einen autonomen Lauf.
