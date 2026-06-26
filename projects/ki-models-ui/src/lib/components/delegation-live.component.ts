@@ -9,7 +9,7 @@ import { SortState, nextSort, sortGlyph, sortRows, filterRows } from './table-to
  * v0.17.0 — Live-Browser-Watcher für Delegations-Calls.
  *
  * Zeigt die letzten `maxRows` Delegations-Calls in einer kompakten Tabelle.
- * - Zeit (toLocaleTimeString), ✓/✗-Status (grün/rot), Provider:Modell,
+ * - Zeit (toLocaleString — Datum + Uhrzeit), ✓/✗-Status (grün/rot), Provider:Modell,
  *   [Service], Output-Chars, und — falls `logPromptSnippet` AN — der Snippet.
  * - Auto-Refresh alle `autoRefreshSec` Sekunden (Default 5s).
  * - Graceful 404/Fehler → leerer Zustand, kein Crash.
@@ -205,7 +205,9 @@ export class DelegationLiveComponent implements OnInit, OnDestroy {
     try {
       const d = new Date(calledAt);
       if (isNaN(d.getTime())) return '—';
-      return d.toLocaleTimeString();
+      // Datum + Uhrzeit — sonst sind Eintraege ueber mehrere Tage nicht
+      // unterscheidbar (vorher nur toLocaleTimeString).
+      return d.toLocaleString();
     } catch {
       return '—';
     }

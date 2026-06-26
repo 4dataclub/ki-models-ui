@@ -33,6 +33,24 @@ import { CallOverviewComponent } from './call-overview.component';
 import { FailoverAnalyticsComponent } from './failover-analytics.component';
 import { DelegationLiveComponent } from './delegation-live.component';
 
+/**
+ * Default-Provider-Optionen für die Failover-Chain-Dropdowns. Wird genutzt
+ * wenn der Konsument `cascadeProviderOptions` nicht setzt — ein leerer Default
+ * würde den Provider-Dropdown komplett leer rendern (`validProviders()` filtert
+ * gegen eine leere Liste). `validProviders()` engt diese Liste ohnehin auf die
+ * Provider ein, für die wirklich Modelle existieren, also ist die volle Liste
+ * hier unbedenklich. Spiegelt den Default in {@link CascadesViewComponent}.
+ */
+export const DEFAULT_CASCADE_PROVIDER_OPTIONS: { value: string; label: string }[] = [
+  { value: 'gemini',        label: 'Gemini (Google)' },
+  { value: 'openai',        label: 'OpenAI' },
+  { value: 'anthropic',     label: 'Anthropic' },
+  { value: 'openrouter',    label: 'OpenRouter' },
+  { value: 'deepseek',      label: 'DeepSeek' },
+  { value: 'ollama',        label: 'Ollama (local)' },
+  { value: 'openai_compat', label: 'Custom OpenAI-compatible' },
+];
+
 /** Optional config bundle — every field is optional; bare mount renders with defaults. */
 export interface KiModelsPageConfig {
   cascadesViewLabels?: Partial<CascadesViewLabels>;
@@ -113,7 +131,7 @@ export interface KiModelsPageConfig {
         [labels]="config.cascadesViewLabels"
         [chainLabels]="config.cascadeChainLabels"
         [hintByCascade]="config.cascadeHints ?? {}"
-        [providerOptions]="config.cascadeProviderOptions ?? []"
+        [providerOptions]="config.cascadeProviderOptions ?? defaultProviderOptions"
         [visibleCascades]="visibleCategories"
         (cascadeChanged)="onCascadeChanged()">
       </ki-cascades-view>
@@ -158,7 +176,7 @@ export interface KiModelsPageConfig {
 
     <!-- ── Supermodell ────────────────────────────────────────────────── -->
 
-    <section class="ki-card">
+    <section class="ki-card" *ngIf="supermodelOn">
       <ki-supermodel-matrix
         [pools]="supermodelPools ?? ['cloud', 'free', 'local']"
         [roles]="supermodelRoles ?? ['orchestrator', 'implement', 'review', 'research', 'dispatch']"
@@ -251,6 +269,9 @@ export interface KiModelsPageConfig {
 export class ModelsPageComponent {
   /** Optional config bundle — all fields optional, defaults apply. */
   @Input() config: KiModelsPageConfig = {};
+
+  /** Template-Fallback für die Failover-Chain-Provider-Dropdowns. */
+  readonly defaultProviderOptions = DEFAULT_CASCADE_PROVIDER_OPTIONS;
 
   // ── Supermodel-Matrix pass-throughs ────────────────────────────────
   @Input() activePool?: string;
