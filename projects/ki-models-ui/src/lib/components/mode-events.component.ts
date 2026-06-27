@@ -112,6 +112,7 @@ import { filterRows } from './table-tools';
     .ki-badge-on   { background: #dbeafe; color: #1d4ed8; }
     .ki-badge-off  { background: #f1f5f9; color: #475569; }
     .ki-badge-pool { background: #ede9fe; color: #6d28d9; }
+    .ki-badge-switch { background: #e0e7ff; color: #3730a3; }
     .ki-transition { color: #334155; flex: 1; }
     .ki-reason { color: #64748b; flex: 1; }
     .ki-when { color: #94a3b8; text-align: right; white-space: nowrap; }
@@ -132,6 +133,7 @@ export class ModeEventsComponent implements OnInit, OnDestroy {
   /** Event-Typen die als „Modus-/Toggle-Umschaltung" gelten. */
   private static readonly MODE_TYPES = new Set([
     'toggle_on', 'toggle_off', 'pool_switch', 'supermodel_on', 'supermodel_off',
+    'model_switch',
   ]);
 
   readonly events = signal<FailoverEvent[]>([]);
@@ -181,6 +183,7 @@ export class ModeEventsComponent implements OnInit, OnDestroy {
       case 'toggle_off':
       case 'supermodel_off': return 'ki-badge-off';
       case 'pool_switch': return 'ki-badge-pool';
+      case 'model_switch': return 'ki-badge-switch';
       default: return 'ki-badge-off';
     }
   }
