@@ -17,6 +17,7 @@ import { DelegationCall } from '../models/delegation-call';
 import { TrendPoint } from '../models/stats-trend';
 import { StatsTotals } from '../models/stats-totals';
 import { FailoverBreakdown, FailoverEvents } from '../models/stats-failover';
+import { LogSnippetRow } from '../models/log-snippet';
 
 /**
  * Library-API-Service. Spricht alle KI-Modell-/API-Key-/Cascade-Endpoints
@@ -437,6 +438,18 @@ export class KiModelsApiService {
         recent: Array.isArray(r?.recent) ? r.recent : [],
         total30d: typeof r?.total30d === 'number' ? r.total30d : 0,
       })),
+    );
+  }
+
+  /**
+   * v0.20.0 — Geloggte Prompt-Snippets (absteigend nach `calledAt`). Speist die
+   * Tabelle in `<ki-log-snippets>`. Existieren nur, wenn `logPromptSnippet` AN
+   * ist UND der Traffic durch die Cascade lief. Leer-Fallback (`[]`) bei
+   * fehlendem Endpoint/Fehler.
+   */
+  getLogSnippets(limit = 50): Observable<LogSnippetRow[]> {
+    return this.http.get<any>(`${this.base}/stats/log-snippets?limit=${limit}`).pipe(
+      map((r) => Array.isArray(r) ? r : []),
     );
   }
 }

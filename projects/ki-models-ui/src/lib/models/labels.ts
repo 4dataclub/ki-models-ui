@@ -51,6 +51,22 @@ export interface ModelsTableLabels {
   /** v0.15.0 — Toggle-Tooltip wenn das Aktivieren wegen Hardware gesperrt ist. */
   toggleHardwareBlocked: string;
   confirmDelete: (modelId: string) => string;
+  /** Edit-Button pro Modell-Zeile (öffnet das Inline-Edit-Formular). */
+  btnEdit: string;
+  /** Überschrift des Inline-Edit-Formulars. */
+  editTitle: string;
+  editFieldProvider: string;
+  editFieldModelId: string;
+  editFieldDisplayName: string;
+  editFieldCategory: string;
+  editFieldApiKeySettingKey: string;
+  editFieldCooldown: string;
+  editFieldServer: string;
+  btnSave: string;
+  btnSaving: string;
+  btnCancel: string;
+  /** Fehlertext wenn das Update fehlschlägt. */
+  editError: string;
 }
 
 export const MODELS_TABLE_LABELS_EN: ModelsTableLabels = {
@@ -89,6 +105,19 @@ export const MODELS_TABLE_LABELS_EN: ModelsTableLabels = {
   hardwareBlocked: 'Hardware insufficient',
   toggleHardwareBlocked: 'Server hardware insufficient — add RAM, use an external server, or pick a smaller model',
   confirmDelete: (id) => `Delete model "${id}"?`,
+  btnEdit: 'Edit',
+  editTitle: 'Edit model',
+  editFieldProvider: 'Provider',
+  editFieldModelId: 'Model ID',
+  editFieldDisplayName: 'Display name',
+  editFieldCategory: 'Category',
+  editFieldApiKeySettingKey: 'API key setting',
+  editFieldCooldown: '503 cooldown override (s)',
+  editFieldServer: 'Inference server',
+  btnSave: 'Save',
+  btnSaving: 'Saving…',
+  btnCancel: 'Cancel',
+  editError: 'Update failed',
 };
 
 export interface AddModelFormLabels {
@@ -257,6 +286,10 @@ export interface CascadesViewLabels {
   editTitleTooltip: string;
   /** Placeholder im Title-Input wenn leer (v0.11.2). */
   editTitlePlaceholder: string;
+  /** Sektion-Überschrift über dem Cascade-Karten-Grid. */
+  sectionTitle: string;
+  /** Tooltip für den manuellen Refresh-Button. */
+  refreshTooltip: string;
 }
 
 export const CASCADES_VIEW_LABELS_EN: CascadesViewLabels = {
@@ -276,6 +309,8 @@ export const CASCADES_VIEW_LABELS_EN: CascadesViewLabels = {
     `Delete display texts for "${title}"? Models stay; remove them in the Models table to make the cascade disappear entirely.`,
   editTitleTooltip: 'Click to edit display name',
   editTitlePlaceholder: 'Display name (e.g. "Free Only — Rate-Limited")…',
+  sectionTitle: 'Cascade areas',
+  refreshTooltip: 'Reload cascade list',
 };
 
 export interface FailoverChainLabels {

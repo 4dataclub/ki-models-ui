@@ -1,7 +1,8 @@
 import { Component, EventEmitter, Input, Output, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { KiModelsApiService } from '../services/ki-models-api.service';
-import { AiModel } from '../models/ai-model';
+import { AiModel, AiModelUpdate } from '../models/ai-model';
 import { ProviderServer } from '../models/provider-server';
 import { ModelsTableLabels, MODELS_TABLE_LABELS_EN } from '../models/labels';
 import { KiPagerComponent, paginate } from './ki-pager.component';
@@ -27,7 +28,7 @@ import { filterRows } from './table-tools';
 @Component({
   selector: 'ki-models-table',
   standalone: true,
-  imports: [CommonModule, KiPagerComponent],
+  imports: [CommonModule, FormsModule, KiPagerComponent],
   template: `
     <div class="ki-models-table">
       <div class="ki-models-table-header">
@@ -49,7 +50,9 @@ import { filterRows } from './table-tools';
            Kategorie scoped — globaler orderIdx wird im Hintergrund neu
            vergeben, aber Cross-Kategorie-Swap ist nicht erlaubt. -->
       <div *ngIf="models().length > 0">
-        <section *ngFor="let cat of categoriesWithModels()" class="ki-category-section">
+        <div *ngFor="let group of categoriesByPool()" class="ki-pool-group">
+          <h3 *ngIf="group.pool" class="ki-pool-title">{{ poolTitle(group.pool) }}</h3>
+          <section *ngFor="let cat of group.cats" class="ki-category-section">
           <header class="ki-category-header">
             <h4 class="ki-category-title">{{ categoryTitle(cat) }}</h4>
             <p class="ki-category-hint">{{ categoryHint(cat) }}</p>
@@ -70,8 +73,8 @@ import { filterRows } from './table-tools';
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let m of pagedModels(cat); let i = index"
-                    [class.ki-row-auto-disabled]="m.autoDisabled">
+                <ng-container *ngFor="let m of pagedModels(cat); let i = index">
+                <tr [class.ki-row-auto-disabled]="m.autoDisabled">
                   <td class="ki-mono ki-muted">{{ catPage(cat) * pageSize + i + 1 }}</td>
                   <td class="ki-mono ki-provider">{{ m.provider }}</td>
                   <td class="ki-mono">
@@ -143,9 +146,62 @@ import { filterRows } from './table-tools';
                       class="ki-btn-primary"
                     >{{ L.btnSetActive }}</button>
                     <button *ngIf="m.autoDisabled" (click)="reEnable(m)" class="ki-btn-warn">{{ L.btnReenable }}</button>
+                    <button (click)="startEdit(m)" class="ki-btn-secondary">{{ L.btnEdit }}</button>
                     <button (click)="remove(m)" class="ki-btn-danger">{{ L.btnDelete }}</button>
                   </td>
                 </tr>
+
+                <!-- Inline-Edit-Zeile: erscheint unter der Modell-Zeile wenn der
+                     Edit-Button geklickt wurde. Voll-Edit der Konfigurationsfelder
+                     (Aktiv-Toggle + Reihenfolge haben eigene Controls oben). -->
+                <tr *ngIf="editingId() === m.id" class="ki-edit-row">
+                  <td [attr.colspan]="8">
+                    <div class="ki-edit-form">
+                      <h5 class="ki-edit-title">{{ L.editTitle }}</h5>
+                      <div class="ki-edit-grid">
+                        <label class="ki-edit-field">
+                          <span class="ki-edit-label">{{ L.editFieldProvider }}</span>
+                          <input [(ngModel)]="editForm.provider" class="ki-edit-input ki-mono" />
+                        </label>
+                        <label class="ki-edit-field">
+                          <span class="ki-edit-label">{{ L.editFieldModelId }}</span>
+                          <input [(ngModel)]="editForm.modelId" class="ki-edit-input ki-mono" />
+                        </label>
+                        <label class="ki-edit-field">
+                          <span class="ki-edit-label">{{ L.editFieldDisplayName }}</span>
+                          <input [(ngModel)]="editForm.displayName" class="ki-edit-input" />
+                        </label>
+                        <label class="ki-edit-field">
+                          <span class="ki-edit-label">{{ L.editFieldCategory }}</span>
+                          <input [(ngModel)]="editForm.category" class="ki-edit-input ki-mono" />
+                        </label>
+                        <label class="ki-edit-field">
+                          <span class="ki-edit-label">{{ L.editFieldApiKeySettingKey }}</span>
+                          <input [(ngModel)]="editForm.apiKeySettingKey" class="ki-edit-input ki-mono" />
+                        </label>
+                        <label class="ki-edit-field">
+                          <span class="ki-edit-label">{{ L.editFieldCooldown }}</span>
+                          <input [(ngModel)]="editForm.cooldown503OverrideSec" type="number" class="ki-edit-input ki-mono" />
+                        </label>
+                        <label *ngIf="editSupportsServer()" class="ki-edit-field">
+                          <span class="ki-edit-label">{{ L.editFieldServer }}</span>
+                          <select [(ngModel)]="editForm.providerServerName" class="ki-edit-input ki-mono">
+                            <option [ngValue]="null">{{ L.serverDefault }}</option>
+                            <option *ngFor="let s of providerServers()" [ngValue]="s.name">{{ s.name }}</option>
+                          </select>
+                        </label>
+                      </div>
+                      <p *ngIf="editError()" class="ki-tiny ki-error">{{ editError() }}</p>
+                      <div class="ki-edit-actions">
+                        <button (click)="saveEdit(m)" [disabled]="savingEdit()" class="ki-btn-primary">
+                          {{ savingEdit() ? L.btnSaving : L.btnSave }}
+                        </button>
+                        <button (click)="cancelEdit()" [disabled]="savingEdit()" class="ki-btn-icon">{{ L.btnCancel }}</button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                </ng-container>
               </tbody>
             </table>
 
@@ -156,7 +212,8 @@ import { filterRows } from './table-tools';
               (pageChange)="setCatPage(cat, $event)">
             </ki-pager>
           </div>
-        </section>
+          </section>
+        </div>
       </div>
     </div>
   `,
@@ -167,6 +224,17 @@ import { filterRows } from './table-tools';
       width: 100%; box-sizing: border-box; padding: 0.4rem 0.6rem;
       margin-bottom: 1rem; border: 1px solid #e2e8f0; border-radius: 0.375rem;
       font-size: 0.8rem;
+    }
+    .ki-pool-group { margin-bottom: 2.5rem; }
+    .ki-pool-group:last-child { margin-bottom: 0; }
+    .ki-pool-title {
+      font-size: 0.9rem;
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      color: #0f172a;
+      margin: 0 0 1rem 0;
+      padding-bottom: 0.4rem;
+      border-bottom: 2px solid #cbd5e1;
     }
     .ki-category-section { margin-bottom: 2rem; }
     .ki-category-section:last-child { margin-bottom: 0; }
@@ -260,6 +328,27 @@ import { filterRows } from './table-tools';
     .ki-ok { color: #059669; font-weight: 700; }
     .ki-cooldown { color: #d97706; font-weight: 700; }
     .ki-error { color: #dc2626; font-weight: 700; }
+    .ki-edit-row td { background: #f8fafc; }
+    .ki-edit-form { padding: 0.5rem 0.25rem; }
+    .ki-edit-title {
+      font-size: 0.65rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.1em; color: #475569; margin: 0 0 0.6rem 0;
+    }
+    .ki-edit-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+      gap: 0.6rem;
+    }
+    .ki-edit-field { display: flex; flex-direction: column; gap: 0.2rem; }
+    .ki-edit-label {
+      font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #64748b;
+    }
+    .ki-edit-input {
+      padding: 0.4rem 0.5rem; border: 1px solid #cbd5e1; border-radius: 0.375rem;
+      font-size: 0.8rem; background: #fff;
+    }
+    .ki-edit-actions { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
+    .ki-edit-actions > button { text-transform: uppercase; }
   `],
 })
 export class ModelsTableComponent {
@@ -320,6 +409,19 @@ export class ModelsTableComponent {
   @Input() visibleCategories: string[] | null = null;
 
   /**
+   * Pool-Anzeigenamen für die Pool-gruppierte Matrix. Wird nur genutzt, wenn
+   * `visibleCategories` gesetzt ist (Switcher-Fall) — dann werden die
+   * Kategorie-Sections zusätzlich nach Pool (cloud → free → local) gruppiert
+   * und mit dieser Überschrift versehen. Fehlt ein Eintrag, fällt der Header
+   * auf den capitalized Pool-Namen zurück.
+   */
+  @Input() poolTitles: Record<string, string> = {
+    cloud: 'Cloud — Premium (bezahlt)',
+    free: 'Free — OpenRouter :free',
+    local: 'Lokal — Ollama (privat)',
+  };
+
+  /**
    * v0.11.3 — Konsumenten-spezifische Liste von Provider-Namen die keinen
    * API-Key brauchen. Zusätzlich zu dem `keyless`-Flag aus dem Backend.
    *
@@ -351,6 +453,16 @@ export class ModelsTableComponent {
   /** Aktuelle Seite je Kategorie (0-basiert). Default 0. */
   readonly pageByCategory = signal<Record<string, number>>({});
   readonly testResult = signal<Record<number, { ok?: boolean; latencyMs?: number; error?: string; pending?: boolean; skipped?: boolean }>>({});
+
+  /** DB-id des Modells dessen Inline-Edit-Formular gerade offen ist (null = keins). */
+  readonly editingId = signal<number | null>(null);
+  readonly savingEdit = signal(false);
+  readonly editError = signal<string | null>(null);
+  /** Arbeitskopie der editierbaren Felder — wird beim Öffnen aus dem Modell befüllt. */
+  editForm: {
+    provider: string; modelId: string; displayName: string; category: string;
+    apiKeySettingKey: string; cooldown503OverrideSec: number | null; providerServerName: string | null;
+  } = { provider: '', modelId: '', displayName: '', category: '', apiKeySettingKey: '', cooldown503OverrideSec: null, providerServerName: null };
   /** v0.15.0 — benannte Inferenz-Server für das pro-Modell-Dropdown. Leer wenn
    *  Backend < 0.8.0 (Endpoint 404) → Dropdown zeigt nur „Default". */
   readonly providerServers = signal<ProviderServer[]>([]);
@@ -397,6 +509,60 @@ export class ModelsTableComponent {
     }
     return ordered;
   });
+
+  /** Bekannte Pools in Anzeige-Reihenfolge. */
+  private readonly POOL_ORDER = ['cloud', 'free', 'local'];
+
+  /**
+   * Leitet den Pool einer Kategorie ab:
+   *   - bare Pool-Name ('cloud'|'free'|'local') → dieser Pool
+   *   - 'free-only' (Legacy) → 'free'
+   *   - Compound '{area|role}-{pool}' → Suffix nach dem letzten '-'
+   *   - sonst (z.B. 'general') → null (nicht gruppierbar)
+   */
+  poolOf(cat: string): string | null {
+    if (cat === 'free-only') return 'free';
+    if (this.POOL_ORDER.includes(cat)) return cat;
+    const idx = cat.lastIndexOf('-');
+    if (idx >= 0) {
+      const suffix = cat.slice(idx + 1);
+      if (this.POOL_ORDER.includes(suffix)) return suffix;
+    }
+    return null;
+  }
+
+  /**
+   * Pool-gruppierte Sicht — nur aktiv, wenn `visibleCategories` gesetzt ist
+   * (Switcher-Matrix). Jede Gruppe enthält die sichtbaren Kategorien-mit-Modellen
+   * dieses Pools in bestehender `categoriesWithModels`-Reihenfolge; Pools in
+   * fester Reihenfolge cloud → free → local. Nur Pools mit mind. einer
+   * Kategorie werden zurückgegeben. Kategorien ohne ableitbaren Pool landen
+   * in einer namenlosen Gruppe (key null) am Ende, ohne Header.
+   */
+  readonly categoriesByPool = computed<{ pool: string | null; cats: string[] }[]>(() => {
+    const cats = this.categoriesWithModels();
+    if (this.visibleCategories == null) return [{ pool: null, cats }];
+    const groups: { pool: string | null; cats: string[] }[] = [];
+    const byPool = new Map<string | null, string[]>();
+    for (const c of cats) {
+      const p = this.poolOf(c);
+      if (!byPool.has(p)) byPool.set(p, []);
+      byPool.get(p)!.push(c);
+    }
+    for (const pool of this.POOL_ORDER) {
+      const list = byPool.get(pool);
+      if (list?.length) groups.push({ pool, cats: list });
+    }
+    // Nicht-poolbare Kategorien (z.B. 'general') ohne Header hinten anhängen.
+    const rest = byPool.get(null);
+    if (rest?.length) groups.push({ pool: null, cats: rest });
+    return groups;
+  });
+
+  /** Header-Label für eine Pool-Gruppe. */
+  poolTitle(pool: string): string {
+    return this.poolTitles[pool] || this.prettifyCategory(pool);
+  }
 
   /**
    * Capitalize + Bindestrich/Underscore zu Leerzeichen — als letztes Fallback
@@ -523,6 +689,58 @@ export class ModelsTableComponent {
     this.api.deleteModel(m.id).subscribe(() => {
       this.modelChanged.emit(null);
       this.reload();
+    });
+  }
+
+  /** Öffnet das Inline-Edit-Formular und befüllt die Arbeitskopie aus dem Modell. */
+  startEdit(m: AiModel): void {
+    this.editError.set(null);
+    this.editForm = {
+      provider: m.provider,
+      modelId: m.modelId,
+      displayName: m.displayName ?? '',
+      category: m.category ?? '',
+      apiKeySettingKey: m.apiKeySettingKey,
+      cooldown503OverrideSec: m.cooldown503OverrideSec ?? null,
+      providerServerName: m.providerServerName ?? null,
+    };
+    this.editingId.set(m.id);
+  }
+
+  cancelEdit(): void {
+    this.editingId.set(null);
+    this.editError.set(null);
+  }
+
+  /** True wenn der im Formular gewählte Provider einen benannten Server unterstützt. */
+  editSupportsServer(): boolean {
+    return this.editForm.provider === 'ollama' || this.editForm.provider === 'openai_compat';
+  }
+
+  saveEdit(m: AiModel): void {
+    const f = this.editForm;
+    const body: AiModelUpdate = {
+      provider: f.provider.trim(),
+      modelId: f.modelId.trim(),
+      displayName: f.displayName.trim() || null,
+      category: f.category.trim() || undefined,
+      apiKeySettingKey: f.apiKeySettingKey.trim(),
+      cooldown503OverrideSec: f.cooldown503OverrideSec,
+      providerServerName: this.editSupportsServer() ? (f.providerServerName || null) : null,
+    };
+    this.savingEdit.set(true);
+    this.editError.set(null);
+    this.api.updateModel(m.id, body).subscribe({
+      next: () => {
+        this.savingEdit.set(false);
+        this.editingId.set(null);
+        this.modelChanged.emit(m);
+        this.reload();
+      },
+      error: (e) => {
+        this.savingEdit.set(false);
+        this.editError.set(e?.error?.error ?? this.L.editError);
+      },
     });
   }
 

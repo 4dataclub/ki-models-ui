@@ -31,6 +31,7 @@ import { ModelsPerformanceComponent } from './models-performance.component';
 import { ModelsCooldownStateComponent } from './models-cooldown-state.component';
 import { CallOverviewComponent } from './call-overview.component';
 import { FailoverAnalyticsComponent } from './failover-analytics.component';
+import { LogSnippetsComponent } from './log-snippets.component';
 import { DelegationLiveComponent } from './delegation-live.component';
 
 /**
@@ -88,6 +89,9 @@ export interface KiModelsPageConfig {
   failoverAnalyticsLabels?: Partial<FailoverAnalyticsLabels>;
   analyticsPageSize?: number;
   analyticsCostPerMillionTokens?: number;
+  logSnippetsTitle?: string;
+  logSnippetsSubtitle?: string;
+  logSnippetsLimit?: number;
 }
 
 /**
@@ -97,12 +101,14 @@ export interface KiModelsPageConfig {
  * `<ki-models-page></ki-models-page>` works with EduPro defaults.
  *
  * Canonical order:
+ * Supermodell: supermodel-matrix (nur sichtbar wenn supermodelOn — oben damit
+ *              der User die aktive Rollen-Matrix direkt beim Öffnen sieht)
  * Verwaltung: cascades-view → models-table →
  *             add-model-form → api-keys-section → privacy-settings
- * Supermodell: supermodel-matrix
  * Statistiken: provider-servers → models-quality-stats →
  *              models-performance → models-cooldown-state →
- *              call-overview → failover-analytics → delegation-live
+ *              call-overview → failover-analytics → log-snippets →
+ *              delegation-live
  */
 @Component({
   selector: 'ki-models-page',
@@ -121,9 +127,25 @@ export interface KiModelsPageConfig {
     ModelsCooldownStateComponent,
     CallOverviewComponent,
     FailoverAnalyticsComponent,
+    LogSnippetsComponent,
     DelegationLiveComponent,
   ],
   template: `
+    <!-- ── Supermodell (oben — nur sichtbar wenn aktiv) ─────────────── -->
+
+    <section class="ki-card" *ngIf="supermodelOn">
+      <ki-supermodel-matrix
+        [pools]="supermodelPools ?? ['cloud', 'free', 'local']"
+        [roles]="supermodelRoles ?? ['orchestrator', 'implement', 'review', 'research', 'dispatch']"
+        [activePool]="activePool"
+        [supermodelOn]="supermodelOn"
+        [localOrchestratorPending]="localOrchestratorPending"
+        [disabled]="supermodelDisabled"
+        [disabledHint]="supermodelDisabledHint ?? 'Supermodell — demnächst verfügbar'"
+        [labels]="supermodelLabels">
+      </ki-supermodel-matrix>
+    </section>
+
     <!-- ── Verwaltung ─────────────────────────────────────────────────── -->
 
     <section class="ki-card">
@@ -156,6 +178,7 @@ export interface KiModelsPageConfig {
       <ki-add-model-form
         [labels]="config.addModelFormLabels"
         [defaultCategoryByProvider]="config.defaultCategoryByProvider ?? {}"
+        [supermodelOn]="addModelFilterEnabled ? supermodelOn : undefined"
         (modelCreated)="onModelCreated($event)">
       </ki-add-model-form>
     </section>
@@ -172,21 +195,6 @@ export interface KiModelsPageConfig {
         [title]="config.privacyTitle ?? 'Datenschutz'"
         [subtitle]="config.privacySubtitle ?? 'Speichert pro Delegations-Call einen gekürzten Prompt-Ausschnitt (max. 160 Zeichen) — nur für Debug/Live-Watch. Standard: AUS (Datenschutz).'">
       </ki-privacy-settings>
-    </section>
-
-    <!-- ── Supermodell ────────────────────────────────────────────────── -->
-
-    <section class="ki-card" *ngIf="supermodelOn">
-      <ki-supermodel-matrix
-        [pools]="supermodelPools ?? ['cloud', 'free', 'local']"
-        [roles]="supermodelRoles ?? ['orchestrator', 'implement', 'review', 'research', 'dispatch']"
-        [activePool]="activePool"
-        [supermodelOn]="supermodelOn"
-        [localOrchestratorPending]="localOrchestratorPending"
-        [disabled]="supermodelDisabled"
-        [disabledHint]="supermodelDisabledHint ?? 'Supermodell — demnächst verfügbar'"
-        [labels]="supermodelLabels">
-      </ki-supermodel-matrix>
     </section>
 
     <!-- ── Statistiken ────────────────────────────────────────────────── -->
@@ -235,6 +243,14 @@ export interface KiModelsPageConfig {
         [labels]="config.failoverAnalyticsLabels"
         [pageSize]="config.analyticsPageSize ?? 10">
       </ki-failover-analytics>
+    </section>
+
+    <section class="ki-card">
+      <ki-log-snippets
+        [title]="config.logSnippetsTitle ?? 'Prompt-Log'"
+        [subtitle]="config.logSnippetsSubtitle ?? 'Zuletzt geloggte Prompt-Snippets. Nur befüllt, wenn Prompt-Logging AN ist und Traffic durch die Cascade lief (nicht auf dem direkten cloud+Anthropic-Pfad).'"
+        [limit]="config.logSnippetsLimit ?? 50">
+      </ki-log-snippets>
     </section>
 
     <section class="ki-card">
@@ -291,6 +307,14 @@ export class ModelsPageComponent {
    * AUS → nur Pool-Kategorie, AN → nur Rollen-Kategorien des aktiven Pools.
    */
   @Input() visibleCategories: string[] | null = null;
+
+  /**
+   * Wenn `true`, filtert `<ki-add-model-form>` seine Kategorie-Auswahl gemäß
+   * {@link supermodelOn}: AN-Modus zeigt nur Rollen-Areas, AUS-Modus zeigt nur
+   * die übrigen Areas. Default `false` behält das EduPro-Verhalten (kein Filter).
+   * Der Switcher-Konsument setzt das auf `true`.
+   */
+  @Input() addModelFilterEnabled = false;
 
   // ── Re-emitted outputs ─────────────────────────────────────────────
   @Output() modelChanged = new EventEmitter<AiModel | null>();

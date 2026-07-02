@@ -24,6 +24,7 @@ export * from './lib/models/delegation-call';
 export * from './lib/models/stats-trend';
 export * from './lib/models/stats-totals';
 export * from './lib/models/stats-failover';
+export * from './lib/models/log-snippet';
 
 // ─── Service + InjectionToken ────────────────────────────────────────────
 export * from './lib/services/ki-models-api.service';
@@ -50,5 +51,6 @@ export * from './lib/components/ki-area-chart.component';
 export * from './lib/components/ki-donut-chart.component';
 export * from './lib/components/call-overview.component';
 export * from './lib/components/failover-analytics.component';
+export * from './lib/components/log-snippets.component';
 export * from './lib/components/mode-events.component';
 export * from './lib/components/models-page.component';

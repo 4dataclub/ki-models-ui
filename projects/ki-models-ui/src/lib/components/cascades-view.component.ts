@@ -39,6 +39,20 @@ import {
   imports: [CommonModule, FormsModule, FailoverChainComponent],
   template: `
     <div class="space-y-6">
+      <!-- Sektion-Header: Titel + manueller Refresh (kein periodisches Reload mehr) -->
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+          {{ L.sectionTitle }}
+        </h3>
+        <button type="button"
+                (click)="reload()"
+                [disabled]="loading()"
+                [title]="L.refreshTooltip"
+                class="shrink-0 rounded-md bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2.5 py-1 text-sm hover:bg-indigo-200 dark:hover:bg-indigo-900 disabled:opacity-50 disabled:cursor-not-allowed transition">
+          ↻
+        </button>
+      </div>
+
       <!-- Loading -->
       <div *ngIf="loading()" class="text-sm italic text-slate-500">
         {{ L.loading }}
@@ -51,10 +65,15 @@ import {
         <p class="mt-1 text-xs">{{ L.emptyHint }}</p>
       </div>
 
-      <!-- Cascade-Karten — eine pro Bereich -->
-      <div *ngIf="!loading() && displayedCascades().length > 0"
-           class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <article *ngFor="let c of displayedCascades()"
+      <!-- Cascade-Karten — pool-gruppiert (cloud → free → local), eine Card pro Bereich -->
+      <div *ngIf="!loading() && displayedCascades().length > 0" class="space-y-8">
+        <div *ngFor="let group of cascadesByPool()">
+          <h3 *ngIf="group.pool"
+              class="mb-3 pb-1 text-base font-black tracking-tight text-slate-900 dark:text-slate-100 border-b-2 border-slate-300 dark:border-slate-700">
+            {{ poolTitle(group.pool) }}
+          </h3>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <article *ngFor="let c of group.cascades"
                  class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
           <!-- Header -->
           <header class="mb-4 flex items-start justify-between gap-3">
@@ -171,6 +190,8 @@ import {
             </div>
           </div>
         </article>
+          </div>
+        </div>
       </div>
     </div>
   `,
@@ -222,6 +243,17 @@ export class CascadesViewComponent implements OnInit, OnDestroy {
     this._visibleCascades.set(v ?? null);
   }
 
+  /**
+   * Pool-Anzeigenamen für die Pool-gruppierte Matrix. Nur genutzt, wenn eine
+   * `visibleCascades`-Whitelist gesetzt ist (Switcher-Fall) — dann werden die
+   * Cascade-Cards zusätzlich nach Pool (cloud → free → local) gruppiert.
+   */
+  @Input() poolTitles: Record<string, string> = {
+    cloud: 'Cloud — Premium (bezahlt)',
+    free: 'Free — OpenRouter :free',
+    local: 'Lokal — Ollama (privat)',
+  };
+
   /** Cascaden nach optionaler Whitelist gefiltert (Template iteriert darüber). */
   readonly displayedCascades = computed<Cascade[]>(() => {
     const allow = this._visibleCascades();
@@ -230,6 +262,56 @@ export class CascadesViewComponent implements OnInit, OnDestroy {
     const set = new Set(allow);
     return list.filter((c) => set.has(c.name));
   });
+
+  /** Bekannte Pools in Anzeige-Reihenfolge. */
+  private readonly POOL_ORDER = ['cloud', 'free', 'local'];
+
+  /**
+   * Leitet den Pool eines Cascade-Namens ab (analog models-table):
+   *   bare Pool → Pool; 'free-only' → 'free'; Compound '{x}-{pool}' → Suffix;
+   *   sonst → null.
+   */
+  poolOf(name: string): string | null {
+    if (name === 'free-only') return 'free';
+    if (this.POOL_ORDER.includes(name)) return name;
+    const idx = name.lastIndexOf('-');
+    if (idx >= 0) {
+      const suffix = name.slice(idx + 1);
+      if (this.POOL_ORDER.includes(suffix)) return suffix;
+    }
+    return null;
+  }
+
+  /**
+   * Pool-gruppierte Cascade-Cards — nur aktiv, wenn eine `visibleCascades`-
+   * Whitelist gesetzt ist. Reihenfolge cloud → free → local, innerhalb eines
+   * Pools die bestehende `displayedCascades`-Ordnung. Nicht-poolbare Cascaden
+   * (z.B. 'general') landen ohne Header in einer letzten Gruppe (key null).
+   */
+  readonly cascadesByPool = computed<{ pool: string | null; cascades: Cascade[] }[]>(() => {
+    const list = this.displayedCascades();
+    if (this._visibleCascades() == null) return [{ pool: null, cascades: list }];
+    const byPool = new Map<string | null, Cascade[]>();
+    for (const c of list) {
+      const p = this.poolOf(c.name);
+      if (!byPool.has(p)) byPool.set(p, []);
+      byPool.get(p)!.push(c);
+    }
+    const groups: { pool: string | null; cascades: Cascade[] }[] = [];
+    for (const pool of this.POOL_ORDER) {
+      const g = byPool.get(pool);
+      if (g?.length) groups.push({ pool, cascades: g });
+    }
+    const rest = byPool.get(null);
+    if (rest?.length) groups.push({ pool: null, cascades: rest });
+    return groups;
+  });
+
+  /** Header-Label für eine Pool-Gruppe. */
+  poolTitle(pool: string): string {
+    return this.poolTitles[pool]
+      || pool.replace(/[-_]+/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
+  }
 
   /**
    * Display-Metadaten pro Kategorie (v0.10.0). Wird beim init aus
@@ -302,28 +384,23 @@ export class CascadesViewComponent implements OnInit, OnDestroy {
       }));
   });
 
-  /** v0.15.0 — Auto-Refresh (Sekunden, 0 = aus) + 1s-Live-Tick. Vorher lud die
-   *  View nur einmal in ngOnInit → die Cooldown-Zähler froren ein. */
-  @Input() autoRefreshSec = 30;
-  readonly tick = signal(Date.now());
-  private fetchedAt = Date.now();
+  /** Auto-Refresh (Sekunden). Default 0 = AUS: die View lädt nur beim Init und
+   *  danach ausschließlich über den manuellen Refresh-Button. Periodisches
+   *  Reload ließ den ganzen Bereich im Sekundentakt flackern. Opt-in bleibt
+   *  möglich, indem ein Konsument einen Wert > 0 setzt. */
+  @Input() autoRefreshSec = 0;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
-  private tickTimer: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit(): void {
     this.reload();
     if (this.autoRefreshSec > 0) {
       this.refreshTimer = setInterval(() => this.reload(), this.autoRefreshSec * 1000);
     }
-    // Sekunden-Tick für die Live-Anzeige — rein lokal, kein API-Traffic.
-    this.tickTimer = setInterval(() => this.tick.set(Date.now()), 1000);
   }
 
   ngOnDestroy(): void {
     if (this.refreshTimer) clearInterval(this.refreshTimer);
-    if (this.tickTimer) clearInterval(this.tickTimer);
     this.refreshTimer = null;
-    this.tickTimer = null;
   }
 
   reload(): void {
