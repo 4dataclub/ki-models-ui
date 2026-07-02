@@ -58,6 +58,29 @@ plus Konsumenten-eigene Proxy-Endpoints.
 
 ---
 
+## Was die UI schaltet (und was NICHT)
+
+Die geteilte Library steuert die **2D-Matrix Pool × Area** fuer beide Konsumenten
+(EduPro + Switcher). Verfuegbare Schalter:
+
+| Schalter | Wirkung |
+|---|---|
+| **Pool** (cloud/free/local) | waehlt den aktiven Pool — FIX, nie automatisch gewechselt, `local` fail-closed |
+| **Supermodell an/aus** | AN = Orchestrator + fixe Rollen (implement/review/research/dispatch); AUS = freie Area / Catch-All, semantisch via `resolve(purpose, pool)` |
+| **Modell an/aus** (pro Zeile) | aktiviert ein einzelnes Modell (blockiert ohne Key bzw. bei HW-Inkompatibilitaet) |
+
+**Es gibt KEINE Area-Toggles** (implement/review/... einzeln schalten) — Areas
+steuert man indirekt ueber die Modell-Toggles. `<ki-supermodel-matrix>` zeigt die
+Pool×Area-Verteilung nur **an** (kein Schalter darin).
+
+> **Tool-Calling-Hinweis:** Die Cascade ist heute **text-only** — agentische Nutzung
+> (Claude Code mit Tools, oder Orchestrator-Delegation bei supermodel=AN) braucht den
+> geplanten **Tool-Passthrough**. Reine Textnutzung (EduPro) ist unbetroffen.
+> Gesamt-Architektur der Routing-Pfade (Tool-Calling, AN/AUS, beide Projekte):
+> **`claude-code-switcher/docs/ARCHITEKTUR-tool-calling-pfade.md`**.
+
+---
+
 ## Quick-Start
 
 ### Konsumenten-Setup (EduPro / Switcher / sonstige)

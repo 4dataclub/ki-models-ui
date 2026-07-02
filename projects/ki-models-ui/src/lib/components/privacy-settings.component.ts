@@ -61,6 +61,15 @@ import { AppSetting } from '../models/app-setting';
         </div>
       </div>
 
+      <!-- Ehrlicher Hinweis: Logging greift nur für Cascade-Traffic -->
+      <p *ngIf="!loading()" class="ki-scope-hint">
+        Hinweis: Das Logging greift nur für Cascade-Traffic (z. B. free/local
+        bzw. den nicht-direkten Anthropic-Pfad). Auf <strong>cloud+Anthropic
+        direkt</strong> wird die Cascade umgangen — dort entstehen keine Logs,
+        egal wie der Toggle steht. Geloggte Snippets sind im Panel
+        „Prompt-Log“ sichtbar.
+      </p>
+
       <!-- Feedback-Banner: Erfolg / Fehler nach dem Speichern -->
       <div *ngIf="savedMsg()" class="ki-feedback ki-feedback-ok">{{ savedMsg() }}</div>
       <div *ngIf="errorMsg()" class="ki-feedback ki-feedback-err">{{ errorMsg() }}</div>
@@ -118,6 +127,13 @@ import { AppSetting } from '../models/app-setting';
     .ki-checkbox:checked + .ki-switch { background: #4f46e5; }
     .ki-checkbox:checked + .ki-switch::after { transform: translateX(1.1rem); }
     .ki-switch-saving { opacity: 0.5; cursor: not-allowed; }
+
+    .ki-scope-hint {
+      margin: 0.6rem 0 0 0; padding: 0.5rem 0.75rem;
+      background: #f8fafc; border: 1px solid #e2e8f0; border-left: 3px solid #94a3b8;
+      border-radius: 0.375rem; font-size: 0.7rem; line-height: 1.5; color: #64748b;
+    }
+    .ki-scope-hint strong { color: #475569; }
 
     .ki-feedback {
       margin-top: 0.6rem; padding: 0.5rem 0.75rem;

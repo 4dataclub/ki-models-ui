@@ -212,6 +212,26 @@ export class AddModelFormComponent {
    * (z.B. Switcher mit `cloud`/`free-only`) überschreiben das via
    * `[defaultCategoryByProvider]`.
    */
+  /**
+   * Supermodell-Modus (Switcher-Konsument). Steuert das Kategorie-Dropdown:
+   *
+   *  - `true`  → nur Rollen-Areas (orchestrator/implement/review/research/dispatch)
+   *              werden im Datalist angeboten. Der Router routet Rollen-Compounds
+   *              (`{role}-{pool}`) nur bei expliziter Kategorie-Adressierung, daher
+   *              gehört das UI-Anlegen im AN-Modus zu diesem Set.
+   *  - `false` → nur AUS-Areas (alles ausser den 5 Rollen). Aktuell z.B.
+   *              general/dev/utility/content plus die Pool-Fallback-Namen
+   *              (cloud/free/local). Freie Areas kann der User weiterhin
+   *              per Freitext-Eingabe anlegen.
+   *  - `undefined` → kein Filter (EduPro-Verhalten, alle Kategorien sichtbar).
+   */
+  @Input() supermodelOn?: boolean;
+
+  /** Areas die im supermodel=AN-Modus als AN-Compounds klassifiziert werden. */
+  private readonly ROLE_AREAS = new Set([
+    'orchestrator', 'implement', 'review', 'research', 'dispatch'
+  ]);
+
   @Input() defaultCategoryByProvider: Record<string, string> = {
     gemini:        'content',
     openai:        'content',
@@ -358,13 +378,36 @@ export class AddModelFormComponent {
    */
   categoryDropdownOptions(): { value: string; label: string }[] {
     const backend = this.categoriesFromBackend();
-    if (backend.length > 0) {
-      return backend.map(c => ({
-        value: c.name,
-        label: c.displayName?.trim() || this.prettifyCategory(c.name),
-      }));
-    }
-    return this.L.categoryOptions;
+    const source = backend.length > 0
+      ? backend.map(c => ({
+          value: c.name,
+          label: c.displayName?.trim() || this.prettifyCategory(c.name),
+        }))
+      : this.L.categoryOptions;
+    return this.applyModeFilter(source);
+  }
+
+  /**
+   * Filtert Kategorien nach {@link supermodelOn}. Ein Category-Name matcht als
+   * Rollen-Compound wenn er entweder exakt einem Rollen-Namen entspricht
+   * (`implement`) oder dem Muster `{role}-{suffix}` folgt (`implement-cloud`).
+   */
+  private applyModeFilter(
+    opts: { value: string; label: string }[]
+  ): { value: string; label: string }[] {
+    if (this.supermodelOn === undefined) return opts;
+    return opts.filter(o => {
+      const isRole = this.isRoleCategory(o.value);
+      return this.supermodelOn ? isRole : !isRole;
+    });
+  }
+
+  private isRoleCategory(name: string): boolean {
+    const n = (name ?? '').toLowerCase();
+    if (this.ROLE_AREAS.has(n)) return true;
+    const dash = n.indexOf('-');
+    if (dash <= 0) return false;
+    return this.ROLE_AREAS.has(n.substring(0, dash));
   }
 
   private prettifyCategory(c: string): string {
